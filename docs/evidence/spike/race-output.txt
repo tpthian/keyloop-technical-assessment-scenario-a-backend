@@ -1,0 +1,13 @@
+[   21.1 ms] A: INSERT bay=2 tech=7 (uncommitted, holding 300 ms)
+[   75.4 ms] B: INSERT bay=2 tech=7 ...
+[  324.4 ms] A: COMMIT
+[  326.0 ms] A: CONFIRMED bay=2 tech=7
+[  327.9 ms] B: LOST bay=2 tech=7 -> no_bay_overlap (23P01), next candidate
+[  328.0 ms] B: INSERT bay=3 tech=9 ...
+[  329.7 ms] B: CONFIRMED bay=3 tech=9
+
+Final table:
+   ('A', 2, 7)
+   ('B', 3, 9)
+
+OK: exactly one booking per bay and per technician for the overlapping range.

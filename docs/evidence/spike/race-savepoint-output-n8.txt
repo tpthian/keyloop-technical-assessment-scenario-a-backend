@@ -1,0 +1,71 @@
+clients=8 candidates=9 deadlock_timeout=1s
+
+[    78.7 ms] C1: WON bay=1 tech=11 after 1 attempt(s)
+[    80.0 ms] C6: LOST bay=1 tech=11 23P01 no_bay_overlap
+[    80.3 ms] C0: LOST bay=1 tech=11 23P01 no_bay_overlap
+[    80.9 ms] C4: LOST bay=1 tech=11 23P01 no_bay_overlap
+[    83.4 ms] C7: LOST bay=1 tech=11 23P01 no_bay_overlap
+[    83.5 ms] C2: LOST bay=1 tech=11 23P01 no_bay_overlap
+[    83.6 ms] C5: LOST bay=1 tech=11 23P01 no_bay_overlap
+[    83.7 ms] C3: LOST bay=1 tech=11 23P01 no_bay_overlap
+[    84.9 ms] C6: WON bay=2 tech=12 after 2 attempt(s)
+[    86.5 ms] C4: LOST bay=2 tech=12 23P01 no_bay_overlap
+[    86.7 ms] C7: LOST bay=2 tech=12 23P01 no_bay_overlap
+[    86.9 ms] C5: LOST bay=2 tech=12 23P01 no_bay_overlap
+[    87.0 ms] C3: LOST bay=2 tech=12 23P01 no_bay_overlap
+[    87.0 ms] C2: LOST bay=2 tech=12 23P01 no_bay_overlap
+[    87.0 ms] C0: LOST bay=2 tech=12 23P01 no_bay_overlap
+[    89.5 ms] C7: WON bay=3 tech=13 after 3 attempt(s)
+[    90.3 ms] C5: LOST bay=3 tech=13 23P01 no_bay_overlap
+[    90.4 ms] C3: LOST bay=3 tech=13 23P01 no_bay_overlap
+[    90.5 ms] C2: LOST bay=3 tech=13 23P01 no_bay_overlap
+[    92.2 ms] C0: LOST bay=3 tech=13 23P01 no_bay_overlap
+[    92.4 ms] C4: LOST bay=3 tech=13 23P01 no_bay_overlap
+[  1092.5 ms] C2: LOST bay=4 tech=14 40P01 deadlock
+[  1095.9 ms] C2: WON bay=5 tech=15 after 5 attempt(s)
+[  2092.4 ms] C3: LOST bay=4 tech=14 40P01 deadlock
+[  2098.3 ms] C3: LOST bay=5 tech=15 23P01 no_bay_overlap
+[  2103.7 ms] C3: WON bay=6 tech=16 after 6 attempt(s)
+[  3093.0 ms] C5: LOST bay=4 tech=14 40P01 deadlock
+[  3097.7 ms] C5: LOST bay=5 tech=15 23P01 no_bay_overlap
+[  3100.2 ms] C5: LOST bay=6 tech=16 23P01 no_bay_overlap
+[  3104.3 ms] C5: WON bay=7 tech=17 after 7 attempt(s)
+[  4095.1 ms] C0: LOST bay=4 tech=14 40P01 deadlock
+[  4099.6 ms] C4: WON bay=4 tech=14 after 4 attempt(s)
+[  4101.8 ms] C0: LOST bay=5 tech=15 23P01 no_bay_overlap
+[  4106.8 ms] C0: LOST bay=6 tech=16 23P01 no_bay_overlap
+[  4109.9 ms] C0: LOST bay=7 tech=17 23P01 no_bay_overlap
+[  4114.1 ms] C0: WON bay=8 tech=18 after 8 attempt(s)
+
+appointment:
+   ('C0', 8, 18)
+   ('C1', 1, 11)
+   ('C2', 5, 15)
+   ('C3', 6, 16)
+   ('C4', 4, 14)
+   ('C5', 7, 17)
+   ('C6', 2, 12)
+   ('C7', 3, 13)
+idem_key:
+   ('C0', 36, '201')
+   ('C1', 1, '201')
+   ('C2', 27, '201')
+   ('C3', 29, '201')
+   ('C4', 25, '201')
+   ('C5', 32, '201')
+   ('C6', 9, '201')
+   ('C7', 16, '201')
+
+per client:
+   C0: {'attempts': 8, 'e23P01': 6, 'e40P01': 1, 'won': (8, 18), 'error': None, 'latency_ms': 4115.3}
+   C1: {'attempts': 1, 'e23P01': 0, 'e40P01': 0, 'won': (1, 11), 'error': None, 'latency_ms': 81.1}
+   C2: {'attempts': 5, 'e23P01': 3, 'e40P01': 1, 'won': (5, 15), 'error': None, 'latency_ms': 1097.2}
+   C3: {'attempts': 6, 'e23P01': 4, 'e40P01': 1, 'won': (6, 16), 'error': None, 'latency_ms': 2105.2}
+   C4: {'attempts': 4, 'e23P01': 3, 'e40P01': 0, 'won': (4, 14), 'error': None, 'latency_ms': 4102.0}
+   C5: {'attempts': 7, 'e23P01': 5, 'e40P01': 1, 'won': (7, 17), 'error': None, 'latency_ms': 3108.0}
+   C6: {'attempts': 2, 'e23P01': 1, 'e40P01': 0, 'won': (2, 12), 'error': None, 'latency_ms': 85.5}
+   C7: {'attempts': 3, 'e23P01': 2, 'e40P01': 0, 'won': (3, 13), 'error': None, 'latency_ms': 90.1}
+
+23P01=24 40P01=4 overlaps=0 unexpected=[]
+
+OK V-001: ROLLBACK TO SAVEPOINT recovered from 40P01 inside one transaction; key rows and winners committed together; zero overlaps.
