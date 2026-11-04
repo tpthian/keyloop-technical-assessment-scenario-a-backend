@@ -2,7 +2,7 @@
 
 ``UseCases`` is built once by ``create_app`` and handed to each router factory
 (``build_router(uc)``); handlers close over it. It is never stored on ``app.state``, which holds
-only the engine for readiness (Known Facts 3). ``GetAvailability`` joins the container in T10b.
+only the engine for readiness (Known Facts 3).
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from fastapi import Request
 
 from scheduler.application.book_appointment import BookAppointment
 from scheduler.application.get_appointment import GetAppointment
+from scheduler.application.get_availability import GetAvailability
 from scheduler.application.ports import SchedulingReadRepository
 from scheduler.interfaces.http.errors import BadRequest
 
@@ -41,3 +42,4 @@ class UseCases:
     reads: SchedulingReadRepository  # ADR-008 step 2: the dealership is loaded before BEGIN
     book_appointment: BookAppointment
     get_appointment: GetAppointment
+    get_availability: GetAvailability
