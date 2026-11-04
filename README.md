@@ -4,6 +4,8 @@ Status: implemented; see Testing for the evidence.
 
 ## Quick start
 
+Requires Docker (with Compose), [uv](https://docs.astral.sh/uv/) and `make`; uv installs Python 3.12 and the dependencies. The demo also needs `curl`, `jq` and `python3` on the host.
+
 ```bash
 make install   # uv sync + install pre-commit hooks
 make up        # start PostgreSQL 16 (docker compose, db only)
@@ -77,13 +79,15 @@ The example dates are illustrative; a booking must start in the future and withi
 
 ```bash
 START="$(python3 -c 'import datetime as d; t = d.date.today(); print(t + d.timedelta(days=7 - t.weekday()))')T09:00:00"
-curl -s -X POST http://localhost:8000/dealerships/1/appointments \
+curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:8000/dealerships/1/appointments \
   -H "Idempotency-Key: $(python3 -c 'import uuid; print(uuid.uuid4())')" \
   -H 'Content-Type: application/json' \
   -d '{"service_type_id": 1, "start_at": "'"$START"'",
        "customer": {"id": "C-42", "email": null, "name": "Sam Lee"},
        "vehicle": {"id": null, "vin": "WVWZZZ1JZXW000001", "make": "VW", "model": "Golf"}}'
 ```
+
+On a fresh database (`make up && make migrate && make run`) this prints the body below and `HTTP 201`. Sent again with a new key, or after `make demo` (whose section 2 books the same car at the same time), it prints 409 `vehicle_already_booked`; change the VIN or the hour to book again.
 
 Response 201, also the body of `GET .../appointments/{appointment_id}`; instants in UTC; `pickup_from` is `end_at` when that falls inside opening hours, else the next opening instant:
 
