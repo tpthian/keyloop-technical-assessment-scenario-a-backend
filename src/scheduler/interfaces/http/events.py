@@ -109,8 +109,7 @@ class WideEventMiddleware:
         except Exception:
             ev["code"] = "error"
             ev["final"] = False
-            if status is None:
-                status = 500
+            if status is None:  # nothing sent yet: answer with the error body
                 await send(
                     {
                         "type": "http.response.start",
@@ -119,6 +118,7 @@ class WideEventMiddleware:
                     }
                 )
                 await send({"type": "http.response.body", "body": ERROR_BODY})
+            status = 500  # the event records 500 even if a response had already started
             raise
         finally:
             _finish(ev, scope, 500 if status is None else status, started)
