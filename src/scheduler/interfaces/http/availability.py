@@ -12,7 +12,7 @@ the use case's dict, so nothing is re-serialised through them.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -59,7 +59,7 @@ def build_router(uc: UseCases) -> APIRouter:
         service_type_id: int,
         from_: Annotated[date, Query(alias="from")],
         to: Annotated[date, Query(alias="to")],
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         request.state.ev["service_type_id"] = service_type_id  # after query validation
         body = await uc.get_availability.execute(dealership_id, service_type_id, from_, to)
         return dict(body)
