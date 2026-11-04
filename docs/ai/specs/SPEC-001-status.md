@@ -88,3 +88,11 @@ TC-36 / local CI equivalent (D-045): `uv run pre-commit run --all-files` green; 
 TC-38: `grep -Ec '^## (API|Running the demo|Testing)$' README.md` → 3; line 3 reads `Status: implemented; see Testing for the evidence.`; `git diff -U0 master -- README.md | grep '^@@'` → hunks at line 3 and inside the three sections only.
 Audit: docs/ai/reviews/SPEC-001-T13-audit.md — pass (cycle 2).
 Open: README placeholder `OUTPUT-PENDING-T11` is filled at the T11 merge (D-048 pending).
+
+## D-048 (ADR-004 amendment: per-dealership serialisation; D-049, D-050 follow-ups)
+Commits on leg/d048: 440c37a (T7 advisory lock adapter), 3d3e403 (T6 serialise after the key claim), 687fb04 (T5 40P01 keeps the pair), 5433422 + 752bcb4 (ADR-004 amendment, SPEC rows), 7ed95e0 (T5 block wording, audit cycle 1), 9a6a682 (D-049: TC-31 synchronises the clients, not the attempts), 918ecb8 (D-050: retry loop as the fallback behind the lock, AC-16/TC-39, TC-31 attempts total), 977b5fd (audit); merged 67f1f6f. Doc coherence on the feature branch: 94daeed (design, ADR-008, README wording), ffc7d14 (design wording for D-050).
+Gates on the merged branch: `uv run pytest -q` → 106 passed; `uv run mypy src tests/fakes.py` green; `uv run pre-commit run --all-files` green.
+TC-01, TC-02 (40P01 keeps the pair, bound), TC-11 (`serialise` after the claim, before the gate and any reserve, never on a replay), adapter test (lock held until commit) pass. L-005 recorded in docs/ai/lessons.md.
+Audit: docs/ai/reviews/SPEC-001-D048-audit.md — pass (cycle 4). Cycle 1: SPEC T5 wording. Cycle 2: TC-31's in-transaction barrier deadlocks against the lock → D-049. Cycle 3: TC-31 `attempts >= 8` unimplementable under serialisation → D-050.
+Deviation (accepted): commit 7ed95e0's subject cites "D-048 audit cycle 1" and no design section or ADR; history kept as is because the committed cycle-2 audit cites that sha.
+Open: T11 (TC-20, TC-31, TC-39) on this head; README placeholder `OUTPUT-PENDING-T11` and the test-table row for `tests/test_concurrency.py` filled at the T11 merge.
