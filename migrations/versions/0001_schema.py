@@ -128,8 +128,7 @@ CREATE TABLE idempotency_key (
 GRANT SET ON PARAMETER deadlock_timeout TO CURRENT_USER""",
 )
 
-# Reverse order of creation. btree_gist stays: CREATE EXTENSION IF NOT EXISTS may have found it
-# already installed, so this migration cannot know it owns it.
+# Reverse order of creation, ending with the extension the first statement created.
 DOWNGRADE: tuple[str, ...] = (
     "REVOKE SET ON PARAMETER deadlock_timeout FROM CURRENT_USER",
     "DROP TABLE idempotency_key",
@@ -142,6 +141,7 @@ DOWNGRADE: tuple[str, ...] = (
     "DROP TABLE service_bay",
     "DROP TABLE opening_hours",
     "DROP TABLE dealership",
+    "DROP EXTENSION IF EXISTS btree_gist",
 )
 
 
