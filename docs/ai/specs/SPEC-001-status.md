@@ -1,6 +1,6 @@
 # SPEC-001 implementation status
 
-Status: in-progress
+Status: audited
 Branch: feat/spec-001-booking-service
 Base: f0f4117 (T0b, spec approved)
 
@@ -111,3 +111,12 @@ Open: `barrier_gate` in tests/conftest.py is unused since D-049 (T2's file); rem
 ## T13 (final: README fill, conftest, coherence)
 Commits on leg/t13-final (BASE bba578f): 6a3a0e4 (README: V-002 line, test-table row for TC-20/TC-31/TC-39, Known limitations bullet for the dealership lock, stale race wording), f208fdf (T2: unused `barrier_gate` removed from tests/conftest.py), coherence commit (ADR-004 ordering, capacity and measured-figure notes; design.md rejected-alternatives qualifier; SPEC D-041 item 4 superseded note, booking-sequence gate comment, AC-10 traceability, T2 block note, D-049/D-050 rows dated and ordered).
 Closes the Open lines of T13, D-048 and T11: `OUTPUT-PENDING-T11` filled; `barrier_gate` removed.
+Coherence cross-check: docs/ai/reviews/SPEC-001-coherence-crosscheck.md — pass (cycle 2; cycle 1 F-1..F-5 fixed in ca609d9: ADR-004 pool limitation and pruning parenthesis, lock ordering and pool limit stated without an unproven guarantee, TC-39 row names the `engine.begin()` transaction). Evidence correction: the after-lock run count is 19 (3 + 10 + 6), not 20.
+
+## Final gate
+Scope: SPEC-001 whole, `git diff bdb70d0..377e994` (feature-branch base to the coherence cross-check head).
+Gates on 377e994: `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock uv run pytest -q` → 109 passed; `uv run mypy src tests/fakes.py` → no issues in 34 source files; `uv run pre-commit run --all-files` → all hooks passed; `scripts/demo.sh` on a compose stack of this tree (unique project, db port unpublished, `API_URL` on a free port) → sections 1–8, race 2 x 201 + 6 x 409 `capacity_exhausted` with losers at `attempts` 0, last line `0`.
+Audit: docs/ai/reviews/SPEC-001-code-audit.md — pass (cycle 1), one low finding F-001 recorded below.
+Deviation (accepted, F-001): commit 9e3ae18 `SPEC-001 consolidate-a: Codex audit (pass)` uses neither the `SPEC-001 T<n>:` form nor a design or ADR citation; history kept as is.
+Closing-leg commits on leg/t13-final (BASE bba578f): 6a3a0e4, f208fdf, d984a7c, ca609d9, 377e994, and this status commit.
+Open for the author: test-seam comments at `src/scheduler/application/book_appointment.py:64,104` and `src/scheduler/main.py:49` still name the barrier race (the seam serves TC-39 since D-049, D-050); the race banner in `scripts/demo.sh` says "allow 2 concurrent winners". Both outside the closing leg's paths.
