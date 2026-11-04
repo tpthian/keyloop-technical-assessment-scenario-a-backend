@@ -4,13 +4,13 @@ Python 3.12, FastAPI, PostgreSQL 16. Each decision, its rejected alternatives an
 
 ## TL;DR
 
-The database is the referee. A booking request lists free (bay, qualified technician) pairs, inserts one `appointment` row per attempt, and lets PostgreSQL exclusion constraints decide. A loser moves to the next pair, at most five times, and gets one answer that is never revoked.
+The database is the referee. A booking request lists free (bay, qualified technician) pairs, inserts one `appointment` row per attempt, and lets PostgreSQL exclusion constraints decide. A loser of a named resource conflict moves to the next pair, at most five times, and gets one answer that is never revoked. Bookings of one dealership run one at a time behind a transaction-scoped advisory lock, so attempts form no lock cycles (ADR-004 amendment, D-048).
 
 | Section | Answer | Where |
 |---|---|---|
 | 1. Architecture | One bounded service owns bays, technicians, skills and the calendar; tenant = `dealership_id`; the CRM is never on the booking path | ADR-003, ADR-007 |
 | 2. Components | Three exclusion constraints (bay, technician, `vehicle_key`) and composite tenancy foreign keys hold for any writer | ADR-004 |
-| 3. Data flow | Validate, claim the `Idempotency-Key`, one savepoint per attempt; 23P01 and 40P01 both mean "next pair"; 201, final 409 `capacity_exhausted` or `vehicle_already_booked`, transient 409 `contention` | ADR-004, ADR-008 |
+| 3. Data flow | Validate, claim the `Idempotency-Key`, take the dealership's advisory lock, one savepoint per attempt; 23P01 prunes the lost resource, 40P01 counts the attempt and the deadlock and prunes nothing; 201, final 409 `capacity_exhausted` or `vehicle_already_booked`, transient 409 `contention` | ADR-004, ADR-008 |
 | 4. Technology | Python 3.12, FastAPI, psycopg 3, SQLAlchemy Core, Alembic, PostgreSQL 16 `btree_gist`; one primary, replicas for availability only, shard by dealership; 1,000 sites is an assumption | ADR-002, ADR-004 |
 | 5. Observability | One wide JSON event per request on stdout is the product; servers attach later | ADR-013 |
 | 6. GenAI | The author proposes, decides and overrides; AI challenges, drafts, reviews and verifies | [docs/ai/](ai/README.md) |
@@ -112,12 +112,16 @@ sequenceDiagram
     alt key exists
         S-->>C: replay, or 422 replay_conflict
     else claimed
+        S->>D: pg_advisory_xact_lock(dealership_id), released at COMMIT or ROLLBACK
         S->>D: business validation, stored 422 on failure
         loop up to 5 attempts
             S->>D: SAVEPOINT, INSERT appointment
-            alt 23P01 bay or technician, or 40P01 deadlock
+            alt 23P01 bay or technician
                 D-->>S: ROLLBACK TO SAVEPOINT
                 S->>S: prune lost resource, next pair
+            else 40P01 deadlock (not expected once serialised)
+                D-->>S: ROLLBACK TO SAVEPOINT
+                S->>S: count the deadlock, keep the pair
             else inserted
                 D-->>S: RELEASE SAVEPOINT
             end
@@ -130,9 +134,9 @@ sequenceDiagram
 
 - Rule: one transaction covers key claim, appointment and recorded response; READ COMMITTED, PostgreSQL's default.
 - Rule: one savepoint per attempt, because a failed INSERT aborts the transaction and the key claim shares it. Evidence: [race_savepoint.py](evidence/spike/race_savepoint.py), [n8 trace](evidence/spike/race-savepoint-output-n8.txt): 24 x 23P01 and 4 x 40P01 recovered, 0 overlaps.
-- Rule: commit order is the arbiter. Simultaneous inserts may deadlock (40P01) because the gist entry is inserted before the check; the loser rolls back to the savepoint. Exactly one wins, never zero, never two.
+- Rule: commit order is the arbiter. Exactly one wins, never zero, never two. Simultaneous inserts could deadlock (40P01) because the gist entry is inserted before the check; since D-048 the bookings of one dealership take `pg_advisory_xact_lock(dealership_id)` after the key claim, so no lock cycle forms and no 40P01 is expected on the attempt path. If one arrives, the loser rolls back to the savepoint, the deadlock is counted and the pair stays in the list. Amendment: [ADR-004](adr/ADR-004.md#amendment-d-048-2026-11-05).
 - Rule: three 409 codes. `capacity_exhausted`: pruned list empty, final. `vehicle_already_booked`: 23P01 on `no_vehicle_overlap`, final. `contention`: bound of 5 hit with pairs left, transient, key claim discarded.
-- Rule: `SET LOCAL deadlock_timeout = '100ms'` and `statement_timeout` 2 s, so five deadlocked attempts cost about 500 ms inside the 1,000 ms good bound. The migration grants `SET ON PARAMETER deadlock_timeout`. Latency budget: [ADR-004](adr/ADR-004.md#latency-budget).
+- Rule: `SET LOCAL deadlock_timeout = '100ms'` and `statement_timeout` 2 s; five deadlocked attempts would cost about 500 ms inside the 1,000 ms good bound, a ceiling for an unexpected 40P01 rather than the expected race cost (D-048). The migration grants `SET ON PARAMETER deadlock_timeout`. Latency budget: [ADR-004](adr/ADR-004.md#latency-budget).
 - Idempotency boundary: responses produced before BEGIN (400, 404, schema 422) are never stored; business 422, 201 and final 409s are stored and replay until cleanup, at least 24 h; `contention` and 5xx roll back the claim, so a retry with the same key runs again. A crash after commit replays the stored 201. Full table: [ADR-008](adr/ADR-008.md#idempotency-boundary).
 - Time: `start_at` is local wall time in the dealership zone, converted to UTC; a gap time is 422, a repeated time takes the first occurrence. The start must fall in opening hours; the elapsed duration is added in UTC, so `end_at` may cross midnight, closed days and DST (multi-day). `pickup_from`, the first opening instant at or after `end_at`, is derived (ADR-009).
 - Availability: advisory; booking is authoritative. Start windows per pair and local day, duration subtracted on UTC instants then intersected with local hours; at most 14 days inside the 90-day horizon. `as_of` is a data watermark: `pg_last_xact_replay_timestamp()` on a replica, `now()` on the primary. Worked example (London, DST, 72 h, stale replica): [ADR-010](adr/ADR-010.md#worked-example).
@@ -201,7 +205,7 @@ flowchart LR
 - Rule: every request writes one event with `route`, `code`, `final`, `attempts`, `deadlocks`, `idempotency_key` and `latency_ms` among its 17 fields; identifiers only, no email, VIN or `vehicle_key`. Schema table: [ADR-013](adr/ADR-013.md#event-schema-v1).
 - Rule: the SLI covers `book_appointment` only: good is a final outcome within 1,000 ms; `contention` and 5xx are bad; target 99.5 % over 30 days. Classification table: [ADR-013](adr/ADR-013.md#sli).
 - Rule: no metrics endpoint and no background audit. The overlap query runs as an assertion in the concurrency test and as the last line of `demo.sh`.
-- Principles: percentiles, not averages; retries are normal, counted and capped, next pair never same pair; the idempotency key is the end-to-end identifier; trust but verify; wide events, never pre-aggregated; high cardinality in events, not labels; transient and permanent failures classified.
+- Principles: percentiles, not averages; retries are normal, counted and capped, a lost resource is never tried again; the idempotency key is the end-to-end identifier; trust but verify; wide events, never pre-aggregated; high cardinality in events, not labels; transient and permanent failures classified.
 - Limitation: no history beyond container logs and no alerting until a store is attached.
 - Origin: the principles follow Kleppmann's *Designing Data-Intensive Applications* and Majors, Fong-Jones and Miranda's *Observability Engineering*.
 

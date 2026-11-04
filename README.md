@@ -147,7 +147,7 @@ The tests start their own PostgreSQL 16 container with testcontainers (ADR-002) 
 | `tests/test_architecture.py` | all | The layer rule: `domain` imports only the standard library, `application` only `domain`, `infrastructure` and `interfaces` never import each other, only `main` imports both |
 | `tests/test_time_rules.py` | domain | Local to UTC with the DST gap rejected and the first occurrence of a repeated time; start inside hours; `end_at` of a 4,320-minute service across the DST change; `pickup_from` over closed days |
 | `tests/test_canonical.py` | domain | The request hash ignores key order, whitespace, null fields and VIN spacing, and uses the UTC instant |
-| `tests/test_attempts.py` | domain | Pruning by constraint name, 40P01 prunes only the pair, the bound of 5 gives `contention`, an empty list gives `capacity_exhausted` |
+| `tests/test_attempts.py` | domain | Pruning by constraint name, 40P01 prunes nothing and the same pair is retried within the bound of 5, the bound gives `contention`, an empty list gives `capacity_exhausted` |
 | `tests/test_windows.py` | domain | Busy ranges merged, free gaps, duration subtracted on UTC instants, closing bound `closes - 1 min` |
 | `tests/test_book_appointment_usecase.py` | application | The booking use case on in-memory fakes: replay, `replay_conflict`, business 422 recorded, scripted reserve outcomes, `contention` rolled back with nothing recorded |
 | `tests/test_postgres_adapters.py` | infrastructure | `reserve` maps 23P01 to `ResourceTaken` and the transaction continues after the savepoint; `claim`, `record`, `free_candidates` |
@@ -169,7 +169,7 @@ TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock uv run pytest tests/t
 OUTPUT-PENDING-T11
 ```
 
-The race asserts the invariant, never a particular SQLSTATE: at low client counts a barrier race rarely produces a 40P01 deadlock, so the test accepts any mix of 23P01 and 40P01 and checks the winner count and the overlap count (L-001).
+The race asserts the invariant, never a particular SQLSTATE: the test accepts any mix of 23P01 and 40P01 and checks the winner count and the overlap count (L-001). Since bookings of one dealership are serialised behind an advisory lock (ADR-004 amendment), no 40P01 is expected and every loss is a clean 23P01 (L-005).
 
 Known limitations:
 
