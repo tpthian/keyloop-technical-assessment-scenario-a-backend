@@ -355,10 +355,9 @@ class UnitOfWork(Protocol):
     idempotency: IdempotencyRepository
     reads: SchedulingReadRepository  # same connection, for in-transaction reference reads
 
-    async def serialise(self, dealership_id: int) -> None: ...
-
     # transaction-scoped advisory lock (pg_advisory_xact_lock): bookings of one dealership run
     # one at a time; no lock cycles, so no 40P01 under contention (ADR-004 amendment, D-048)
+    async def serialise(self, dealership_id: int) -> None: ...
 
     async def __aenter__(self) -> "UnitOfWork": ...
     async def __aexit__(self, et, ev, tb) -> None: ...
@@ -401,7 +400,7 @@ Domain functions (signatures; rules in the ADR named):
 | | `canonical_hash(command, zone) -> str` | sha256 of `json.dumps(sort_keys, separators=(",", ":"))` over `{service_type_id, start_at: canonical_utc(...).isoformat(), customer, vehicle}` with `None` values omitted (ADR-008) |
 | `attempts.py` | `RETRY_BOUND = 5` | |
 | | `shuffled(candidates) -> list[Candidate]` | random order, so simultaneous requests spread over pairs (ADR-004) |
-| | `run_attempts(candidates, reserve: Callable[[Candidate], Awaitable[Confirmed | ResourceTaken]], bound=RETRY_BOUND) -> AttemptResult` | next pair never same pair: `no_bay_overlap` prunes the bay, `no_technician_overlap` prunes the technician, an unknown constraint prunes the pair, 40P01 keeps the pair (D-048), `no_vehicle_overlap` stops with `vehicle_already_booked`; empty list → `capacity_exhausted`; bound hit with pairs left → `contention` |
+| | `run_attempts(candidates, reserve: Callable[[Candidate], Awaitable[Confirmed | ResourceTaken]], bound=RETRY_BOUND) -> AttemptResult` | a lost resource is never tried again: `no_bay_overlap` prunes the bay, `no_technician_overlap` prunes the technician, an unknown constraint prunes the pair, 40P01 keeps the pair (D-048), `no_vehicle_overlap` stops with `vehicle_already_booked`; empty list → `capacity_exhausted`; bound hit with pairs left → `contention` |
 | `windows.py` | `merge(ranges)`, `free(busy, lo, hi)`, `start_windows(dealership, days, duration, busy_by_bay, busy_by_tech, bays, techs, earliest_now) -> list[Window]` | subtract the duration on UTC instants, then intersect with each local day window; latest start is `min(free_end - duration, closes - 1 min)` (ADR-010) |
 | `errors.py` | `DomainError` base; `GapTime(ValueError)`, `NoOpeningInstant`, `NotFound(what)`, `ValidationFailed(message)`, `ReplayConflict`, `Contention(result: AttemptResult)` | HTTP mapping lives in the interface layer |
 
