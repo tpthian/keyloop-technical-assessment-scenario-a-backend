@@ -163,15 +163,37 @@ jq -r '"as_of \(.as_of)",
 section "7. Race: $RACE_CLIENTS clients, one slot, Monday $RACE_MONDAY 09:00"
 echo "2 bays x 2 technicians allow 2 concurrent winners;" \
   "expected 2 x 201 and 6 x 409 capacity_exhausted"
+# Bodies and keys are built first: building them spawns jq and python3, which takes longer
+# than one booking, so building inside the launch loop would serialise the clients. Each
+# client then spins until the start file appears, so all eight are released together.
+for i in $(seq 1 "$RACE_CLIENTS"); do
+  booking "${RACE_MONDAY}T09:00:00" "RACE-$i" "" "RACE-C-$i" >"$OUT/race-$i.body"
+  uuid >"$OUT/race-$i.key"
+done
 pids=()
 for i in $(seq 1 "$RACE_CLIENTS"); do
-  body="$(booking "${RACE_MONDAY}T09:00:00" "RACE-$i" "" "RACE-C-$i")"
-  key="$(uuid)"
-  curl -sS -X POST -o "$OUT/race-$i.json" -w '%{http_code}' \
-    -H "Idempotency-Key: $key" -H 'Content-Type: application/json' --data "$body" \
-    "$API/dealerships/$D/appointments" >"$OUT/race-$i.status" &
+  (
+    key="$(cat "$OUT/race-$i.key")"
+    : >"$OUT/race-$i.armed"
+    while [[ ! -e "$OUT/start" ]]; do :; done
+    curl -sS -X POST -o "$OUT/race-$i.json" -w '%{http_code}' \
+      -H "Idempotency-Key: $key" -H 'Content-Type: application/json' \
+      --data-binary "@$OUT/race-$i.body" \
+      "$API/dealerships/$D/appointments" >"$OUT/race-$i.status"
+  ) &
   pids+=("$!")
 done
+armed=0
+for _ in $(seq 1 100); do
+  armed="$(find "$OUT" -name 'race-*.armed' | wc -l | tr -d ' ')"
+  [[ "$armed" == "$RACE_CLIENTS" ]] && break
+  sleep 0.05
+done
+: >"$OUT/start"
+if [[ "$armed" != "$RACE_CLIENTS" ]]; then
+  echo "demo.sh: only $armed of $RACE_CLIENTS race clients started" >&2
+  exit 1
+fi
 for pid in "${pids[@]}"; do
   wait "$pid"
 done
