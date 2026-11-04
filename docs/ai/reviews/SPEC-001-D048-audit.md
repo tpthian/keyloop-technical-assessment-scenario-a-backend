@@ -1,76 +1,61 @@
 # SPEC-001 D-048 audit
 
 Task: D-048
-Base: `a57b5b2717f44d839ceebb431882b9277ef5c6a6`
-Head: `7ed95e0cdadec80fae23750df9d8416408ba6cfd`
-Date: 2026-11-04
-Reviewer: Codex
-Cycle: 2
+Base-SHA: `a57b5b2717f44d839ceebb431882b9277ef5c6a6`
+Head-SHA: `9a6a68293c54d21404208fa6b1e678fbfb637aa4`
+Cycle: 3
+Commits:
+- `440c37a SPEC-001 T7: advisory lock adapter for UnitOfWork.serialise (ADR-004 amendment, D-048)`
+- `3d3e403 SPEC-001 T6: serialise bookings per dealership after the key claim (ADR-004 amendment, D-048)`
+- `687fb04 SPEC-001 T5: a deadlock loss keeps the pair in the candidate list (ADR-004 amendment, D-048)`
+- `5433422 SPEC-001 T0e: ADR-004 amendment and scope row for D-048 (ADR-004)`
+- `752bcb4 SPEC-001 T0e: SPEC Interfaces wording for D-048 (ADR-004)`
+- `7ed95e0 SPEC-001 T0e: T5 task block qualifies never-same-pair for 40P01 (D-048 audit cycle 1)`
+- `9a6a682 SPEC-001 T0f: TC-31 synchronises the clients before they send, not the attempts (ADR-004, D-049; D-048 audit cycle 2)`
+
+Allowed-Paths: `src/scheduler/application/book_appointment.py`, `src/scheduler/application/ports.py`, `src/scheduler/domain/attempts.py`, `src/scheduler/infrastructure/postgres/unit_of_work.py`, `tests/fakes.py`, `tests/test_attempts.py`, `tests/test_book_appointment_usecase.py`, `tests/test_postgres_adapters.py`, `docs/adr/ADR-004.md`, `docs/ai/lessons.md`, `docs/ai/specs/SPEC-001-booking-service.md`; exception: `docs/ai/reviews/SPEC-001-D048-audit.md`
+Changed-Paths:
+- `M docs/adr/ADR-004.md`
+- `M docs/ai/lessons.md`
+- `A docs/ai/reviews/SPEC-001-D048-audit.md`
+- `M docs/ai/specs/SPEC-001-booking-service.md`
+- `M src/scheduler/application/book_appointment.py`
+- `M src/scheduler/application/ports.py`
+- `M src/scheduler/domain/attempts.py`
+- `M src/scheduler/infrastructure/postgres/unit_of_work.py`
+- `M tests/fakes.py`
+- `M tests/test_attempts.py`
+- `M tests/test_book_appointment_usecase.py`
+- `M tests/test_postgres_adapters.py`
+
+Checks:
+- `git rev-parse --verify a57b5b2717f44d839ceebb431882b9277ef5c6a6^{commit}` — exit `0` — base exists.
+- `git rev-parse --verify 9a6a68293c54d21404208fa6b1e678fbfb637aa4^{commit}` — exit `0` — head exists.
+- `git merge-base --is-ancestor a57b5b2717f44d839ceebb431882b9277ef5c6a6 9a6a68293c54d21404208fa6b1e678fbfb637aa4` — exit `0` — base is an ancestor of head.
+- `git status --short` — exit `0` — clean before this report overwrite; no source, test, or configuration worktree changes.
+- `git diff --name-status a57b5b2717f44d839ceebb431882b9277ef5c6a6..9a6a68293c54d21404208fa6b1e678fbfb637aa4` — exit `0` — 12 changed paths, all allowed or the report exception.
+- `git log --reverse --format='%h %s%n%b' a57b5b2717f44d839ceebb431882b9277ef5c6a6..9a6a68293c54d21404208fa6b1e678fbfb637aa4` — exit `0` — all seven commits have an accepted Claude attribution trailer; one subject lacks a design/ADR citation (F-002).
+- `git diff --check a57b5b2717f44d839ceebb431882b9277ef5c6a6..9a6a68293c54d21404208fa6b1e678fbfb637aa4` — exit `0` — no whitespace errors.
+- `uv run pytest tests/test_attempts.py tests/test_book_appointment_usecase.py -q` — exit `0` — 22 passed in 0.04s.
+- `uv run pytest tests/test_architecture.py -q` — exit `0` — 3 passed in 0.06s.
+- `uv run pre-commit run --all-files` — exit `0` — all hooks, including Ruff and mypy, passed.
+- `uv run mypy src tests/fakes.py` — exit `0` — success, no issues in 34 source files.
+- `uv run pytest tests/test_postgres_adapters.py -q` — exit `n/a` — not run: Docker-backed check is unavailable in this sandbox; implementer recorded 106 passed at `7ed95e0` and `9a6a682` changes documentation only.
+
+Contract-Checks:
+- Range, paths, and worktree — pass — exact specified range inspected; `git diff --name-status` lists only allowed paths and the report exception.
+- Commit protocol and attribution — fail — all subjects have the `SPEC-001 T<n>:` prefix and accepted trailers, but `7ed95e0` cites neither a design section nor ADR (F-002).
+- AC-03 / TC-01 / TC-02 — pass — `src/scheduler/domain/attempts.py:86-103` counts a 40P01 and retains its candidate, bounds five attempts, prunes named 23P01 resources, and stops vehicle conflicts; focused tests pass.
+- AC-04 / TC-11 ordering — pass — `src/scheduler/application/book_appointment.py:70-105` claims first, returns replay/conflict before `serialise`, then locks before validation, reads, gate, and reserve; `tests/test_book_appointment_usecase.py:242-261` asserts the sequence and replay bypass.
+- Advisory-lock lifetime — pass — `src/scheduler/infrastructure/postgres/unit_of_work.py:62-88` uses `pg_advisory_xact_lock` on the transaction connection and commits or rolls back before closing; `tests/test_postgres_adapters.py:151-163` specifies held-until-commit behavior.
+- 40P01 / 23P01 adapter boundary — pass — `src/scheduler/infrastructure/postgres/repositories.py:261-274` catches those SQLSTATEs only around the savepoint INSERT, re-raises all other database errors; the D-048 domain policy preserves the deadlocked pair.
+- Layer direction — pass — `tests/test_architecture.py` passed; the changed domain module imports standard-library modules only, application imports domain only, and infrastructure imports application/domain.
+- D-049 gate removal — pass — SPEC AC-07 and TC-31 at `docs/ai/specs/SPEC-001-booking-service.md:205,251` and the T11 example at `:777-798` synchronise clients before POSTs and inject no attempt gate; ADR-004 says clients, not attempts, start behind a barrier.
+- TC-31 event-attempt assertion — fail — under the required serial execution the first four requests each reserve once and the next four read no candidates, so `run_attempts` returns zero attempts (`src/scheduler/domain/attempts.py:86-104`); the stated `sum(e["attempts"] for e in evs) >= 8` at `docs/ai/specs/SPEC-001-booking-service.md:822` cannot hold (F-001).
+- Regression / weakened-test review — pass — no new xfail, swallowed exception, broad exception-to-success mapping, or unbounded nondeterministic seam in the range; the changed tests exercise the amended behaviors.
+
+Findings:
+- [high] F-001: `docs/ai/specs/SPEC-001-booking-service.md:251,822` — TC-31/T11 still requires event attempts to sum to at least 8, but D-048 serialises the eight distinct-key requests. Four winners reserve once and the four capacity-exhausted requests have an empty candidate list and make zero attempts, for an exact total of 4. This violates the amended ADR-004 consequence and makes T11 unimplementable as specified — change the TC-31 row and T11 assertion to the deterministic total `== 4` (or another assertion consistent with four successful reserves and four zero-attempt capacity results).
+- [low] F-002: `7ed95e0 subject` — the cycle-1 task commit is `SPEC-001 T0e: ... (D-048 audit cycle 1)` and cites neither a task design section nor an ADR, contrary to the SPEC commit protocol — rewrite its subject to cite the applicable source, for example `(ADR-004, D-048 audit cycle 1)`, and rebase descendants as needed.
 
 Verdict: revise
-
-## Findings
-
-- Cycle 2 — Severity: high
-  File: `tests/test_concurrency.py` (missing); `tests/conftest.py:179-190`; `docs/ai/specs/SPEC-001-booking-service.md:205,251,774-821`
-  What: SPEC TC-31 is not exercised: its named test file does not exist. Moreover, the retained specified implementation of TC-31 gives `barrier_gate(8)` to `BookAppointment`. D-048 correctly takes the dealership advisory lock before the gate (`book_appointment.py:71-105`), so the first request holds that lock while waiting at the eight-party gate; the other seven wait at `pg_advisory_xact_lock` and cannot reach the gate. `barrier_gate` therefore raises `TimeoutError` after 10 seconds. The implementer's reported `106 passed` cannot demonstrate the D-048 concurrency acceptance criterion.
-  Required fix: Restore and exercise TC-31 with a concurrency arrangement compatible with post-claim serialisation—for example, synchronize client task start before `execute`/the claim (or do not inject the attempt gate), then assert the required deterministic serialized outcomes. Update the SPEC's TC-31/V-002 example to that arrangement. Keep TC-11's separate assertion that `serialise` is after claim and before the gate.
-
-## Out-of-scope divergences (for the orchestrator)
-
-These paths were intentionally outside D-048. They do not independently change the verdict.
-
-- Severity: documentation
-  File: `docs/design.md:7`
-  What: States that every loser moves to the next pair; a 40P01 loss now retains the pair.
-  Required fix: Limit the statement to a named 23P01 resource conflict and describe the 40P01 exception.
-
-- Severity: documentation
-  File: `docs/design.md:13`
-  What: States that 23P01 and 40P01 both mean “next pair.”
-  Required fix: State that 40P01 counts the attempt and deadlock but prunes nothing; add the post-claim advisory-lock step.
-
-- Severity: documentation
-  File: `docs/design.md:115-120`
-  What: The booking sequence omits `serialise` after the successful claim and joins 23P01 and 40P01 under “prune lost resource, next pair.”
-  Required fix: Insert the advisory-lock step after the no-row claim branch, and split the 23P01 and 40P01 attempt outcomes.
-
-- Severity: documentation
-  File: `docs/design.md:204`
-  What: States “next pair never same pair.”
-  Required fix: Qualify the principle as applying to named resource losses only.
-
-- Severity: documentation
-  File: `docs/adr/ADR-008.md:19-21`
-  What: The request order moves directly from claim to business validation and candidate query, omitting the required post-claim serialisation.
-  Required fix: Add `UnitOfWork.serialise(dealership_id)` after a no-row claim and before business validation.
-
-- Severity: documentation
-  File: `docs/adr/ADR-008.md:28`
-  What: States that every candidate containing the lost resource is pruned for 23P01 or 40P01; a 40P01 names no resource and now prunes nothing.
-  Required fix: Restrict resource pruning to named 23P01 conflicts and refer to the D-048 40P01 rule.
-
-- Severity: documentation
-  File: `docs/adr/ADR-008.md:53`
-  What: States that 40P01 prunes the attempted pair.
-  Required fix: State that 40P01 increments `attempts` and `deadlocks`, retains the candidate list, and remains bounded.
-
-- Severity: documentation
-  File: `README.md:150`
-  What: States that 40P01 prunes only the pair.
-  Required fix: Describe the amended 40P01 rule: no pruning and retry of the same pair, bounded by five attempts.
-
-Additional stale consequence wording remains at `docs/design.md:133,135`, `docs/adr/ADR-008.md:36`, and `README.md:172`: D-048 serialises writers of one dealership, so 40P01 is no longer an expected attempt-path race cost. Those descriptions should distinguish historical/unexpected 40P01 handling from normal booking behaviour.
-
-## Evidence
-
-- Cycle-1 finding resolved: the T5 task block at `docs/ai/specs/SPEC-001-booking-service.md:745` keeps the landed commit title verbatim and immediately qualifies it: a named 23P01 never reuses the pair, while 40P01 keeps it. A full SPEC search found no other statement that says 40P01 prunes a pair or leaves “never same pair” unqualified.
-- Lock placement/replay: `book_appointment.py:71-105` claims first; both stored-row paths return before `serialise`; `serialise` precedes validation, candidate reads, the attempt gate, and `run_attempts`. `test_serialise_after_claim_before_any_reserve_and_never_on_replay` exercises this as TC-11.
-- Adapter/port: `unit_of_work.py:37-75` begins the transaction before retaining the connection; `serialise` executes `pg_advisory_xact_lock(CAST(:key AS bigint))` on that transaction connection; `__aexit__` commits or rolls back and closes it. `test_serialise_holds_the_dealership_lock_until_commit` verifies it is held until commit and then released.
-- Attempt policy: `attempts.py:86-105` counts 40P01 attempts and deadlocks, prunes nothing, retries the same pair, and returns `contention` at the bound. TC-01 and TC-02 assert the retained pair and bound. Named 23P01 pruning and `no_vehicle_overlap` remain distinct.
-- ADR-004's D-048 amendment matches this implementation: post-claim transaction-scoped per-dealership locking; replay bypass; 40P01 retained and bounded. `docs/ai/lessons.md` contains L-005. No `ERR-nnn` or `LSN-*` IDs occur in the D-048 diff. The HEAD trailer uses the accepted `Claude Opus 5.5 <noreply@anthropic.com>` attribution.
-- `git diff --check a57b5b2717f44d839ceebb431882b9277ef5c6a6..HEAD` — no output.
-- `UV_CACHE_DIR=/private/tmp/codex-uv-cache-d048-a62b3e43bb3630172 uv run mypy src tests/fakes.py` — passed: 34 source files.
-- `UV_CACHE_DIR=/private/tmp/codex-uv-cache-d048-a62b3e43bb3630172 uv run pre-commit run --all-files` — passed all hooks.
-- `UV_CACHE_DIR=/private/tmp/codex-uv-cache-d048-a62b3e43bb3630172 uv run pytest -q tests/test_attempts.py tests/test_book_appointment_usecase.py` — 22 passed in 0.04 s.
-- Docker-backed tests were not run in this sandbox. The implementer reports `106 passed` at HEAD; that result does not exercise missing TC-31.

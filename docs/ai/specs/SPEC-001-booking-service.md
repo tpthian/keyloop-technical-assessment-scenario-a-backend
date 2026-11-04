@@ -210,6 +210,7 @@ Wide event, one JSON line on stdout per request, keys in this order: `v, ts, req
 - AC-12 Gates: `make lint` and `make test` pass on the branch; CI passes.
 - AC-13 README: "API", "Running the demo", "Testing" filled; status line updated; other sections untouched.
 - AC-14 Layers: `tests/test_architecture.py` passes: `domain` imports only the standard library and itself; `application` imports only `domain` and itself; `infrastructure` and `interfaces` never import each other; only `main` imports both.
+- AC-16 Retry fallback (D-050): a writer that bypasses the dealership lock and takes a resource between the candidate read and the first INSERT costs the booking one attempt per lost resource; the booking lands on a remaining free pair (201) or ends with 409 `capacity_exhausted` when none remains; never a 5xx, never an overlap.
 - AC-15 Use cases run without a database: `BookAppointment` is exercised end to end against in-memory fakes (claim, replay, validation, attempts, contention rollback), and the fakes implement the same Protocols as the PostgreSQL adapters (mypy checks structural conformance).
 
 ### Test Cases
@@ -248,7 +249,8 @@ Edge and regression first, happy path last. Layer in the fourth column.
 | TC-28 | Availability: 15-day window → 422; `to <= from` → 422; `to` beyond horizon → 422; unknown service type → 422; unknown dealership → 404 | AC-06 | test_availability.py |
 | TC-29 | Availability worked example (London, 72 h, E1, E2, clock 2027-03-25T16:00Z): exactly the two windows of AC-06; `as_of` aware UTC | AC-06 | test_availability.py |
 | TC-30 | Availability with no appointments: every open day `[opens, closes - 1 min]` shifted by the duration at the right end; Sunday absent | AC-06 | test_availability.py |
-| TC-31 | V-002 race: 8 clients against a test-owned fixture of 4 bays and 4 qualified technicians (the seed's 2x2 allows only 2 concurrent winners; D-044); the clients wait on an `asyncio.Barrier(8)` and send together, no attempt gate (the bookings queue on the dealership lock; D-049); statuses {201: 4, 409: 4}; winners distinct; overlap 0; 8 key rows all recorded; events' `attempts` sum ≥ 8; elapsed printed | AC-07, AC-10 | test_concurrency.py |
+| TC-31 | V-002 race: 8 clients against a test-owned fixture of 4 bays and 4 qualified technicians (the seed's 2x2 allows only 2 concurrent winners; D-044); the clients wait on an `asyncio.Barrier(8)` and send together, no attempt gate (the bookings queue on the dealership lock; D-049); statuses {201: 4, 409: 4}; winners distinct; overlap 0; 8 key rows all recorded; events' `attempts` sum == 4 (one per winner, zero per loser: the bookings run one at a time and a loser reads an empty candidate list; D-048); elapsed printed | AC-07, AC-10 | test_concurrency.py |
+| TC-39 | Retry fallback (D-050), two bookings through `create_app` with an `attempt_gate` that, when awaited, inserts on a separate autocommit connection (no `serialise`) an appointment occupying bay 100 for the slot, then returns. (a) Dealership 2 bays x 1 qualified technician: 201 on bay 101; event `attempts == 1 + candidates_pruned`, `candidates_pruned <= 1`, `deadlocks == 0`. (b) Dealership 1 bay x 1 technician: 409 `capacity_exhausted`, event `attempts == 1`, `candidates_pruned == 1`. Overlap 0 after both; 3 appointment rows | AC-16 | test_concurrency.py |
 | TC-32 | Event schema: one line per response, 17 keys in order, `v == 1`; `final` true for 201, final 409 and 422, false for `contention`; health lines carry null booking fields; no `@` and no VIN substring in any line | AC-10 | test_events.py |
 | TC-33 | `/health/live` 200; `/health/ready` 200; with an engine on a closed port, 503 | AC-09 | test_health.py |
 | TC-34 | Seed: 2 dealerships, 3 service types (one 4,320 min), dealership 1 has 2 bays and 2 technicians, both hold `general`, only technician 1 holds `bodywork`; `btree_gist` installed; the nine named constraints exist | AC-01 | test_seed.py |
@@ -294,6 +296,7 @@ Commit protocol (D-040): one task is one or more commits; each commit reviewable
 | AC-13 | TC-38 | T13 | the three commands of TC-38, output recorded in the status file |
 | AC-14 | TC-14 | T1 | `uv run pytest tests/test_architecture.py -q` |
 | AC-15 | TC-09, 10, 11 | T6 | `uv run pytest tests/test_book_appointment_usecase.py -q` |
+| AC-16 | TC-39 | T11 | `uv run pytest tests/test_concurrency.py -q -s` |
 
 ### Interfaces
 
@@ -819,7 +822,8 @@ async def test_v002_race_eight_clients_four_pairs(engine, capsys) -> None:
     evs = [
         json.loads(ln) for ln in capsys.readouterr().out.splitlines() if '"book_appointment"' in ln
     ]
-    assert len(evs) == n and sum(e["attempts"] for e in evs) >= n
+    assert len(evs) == n and sum(e["attempts"] for e in evs) == 4  # serialised: no retries
+    assert all(e["attempts"] == 0 for e in evs if e["code"] == "capacity_exhausted")
     deadlocks = sum(e["deadlocks"] for e in evs)
     print(
         f"\nV-002: {n} clients, 4 pairs, attempts={sum(e['attempts'] for e in evs)}, deadlocks={deadlocks},"
@@ -828,6 +832,8 @@ async def test_v002_race_eight_clients_four_pairs(engine, capsys) -> None:
 ```
 
 Plus TC-20 (two concurrent POSTs with one key: both 201, same body, one row, one key row).
+
+Plus TC-39 (D-050), `test_retry_fallback_when_a_writer_bypasses_the_lock`: the attempt gate is the seam for the bypassing writer; it runs after the candidate read and before the first INSERT, exactly the window the dealership lock closes for requests that honour it. The bypass inserts through `engine.begin()` with `row_of`-shaped values (ids ≥ 100, the same slot as `booking_body()`), so the row commits outside the booking transaction. Case (a) shows the loop landing on the free pair (the shuffle decides whether the blocked bay is tried first, hence `attempts == 1 + candidates_pruned`); case (b) shows the clean 409 when the only pair is lost. Both prove the retry loop is live as the fallback behind the lock (ADR-004 amendment).
 Done when: three consecutive runs pass (`for i in 1 2 3; do uv run pytest tests/test_concurrency.py -q -s || break; done`); the `V-002:` lines go into the status file. Commit: `SPEC-001 T11: V-002 concurrency evidence and parallel same-key test (design §3, ADR-013)`.
 
 **T12: Demo, compose, Makefile** (ADR-012, D-035)
@@ -848,4 +854,5 @@ Done when: `make lint && make test` green; the local CI equivalent recorded in t
 | 2026-11-04 | JP (D-045) | T13 done-when: local CI equivalent recorded; GitHub CI after the authorised push | No-push rule during the overnight run |
 | 2026-11-04 | orchestrator (Execution) | TC-38 heading check uses `grep -Ec '^## (API|Running the demo|Testing)$' README.md` (prints 3 on GNU and BSD grep); T13 paths gain `Makefile` (test target exports the testcontainers socket override) and the CI mypy step is `uv run mypy src tests/fakes.py` (AC-15 requires the fakes to type-check); T12 compose change includes `PYTHONUNBUFFERED=1` on `api` so event lines reach `docker compose logs` | T12/T13 verification findings |
 | 2026-11-05 | JP (D-048) | UnitOfWork.serialise(dealership_id) after the claim; 40P01 keeps the pair; TC-01 deadlock clause and the Booking sequence updated | Race finding: deadlock detection latency and a false capacity_exhausted |
+| 2026-11-04 | JP (D-050) | AC-16, TC-39 added to T11: retry-fallback test where a writer bypasses the dealership lock from the attempt gate; the `AttemptGate` seam stays for this purpose. TC-31 `attempts` sum becomes `== 4` with zero attempts per loser (D-048 audit cycle 3 F-001, Execution) | Under D-048 the retry loop fires only for writers around the lock; the fallback needs evidence, and the old `>= 8` was unimplementable |
 | 2026-11-04 | JP (D-049) | TC-31, AC-07, T11 block: the race synchronises the 8 clients before they send (`asyncio.Barrier` in the test, no attempt gate); AC-07 and the T11 example aligned with the D-044 fixture (4 bays x 4 technicians); TC-11 unchanged | D-048 audit cycle 2: an attempt gate inside the transaction deadlocks against the dealership lock taken before it |
