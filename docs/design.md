@@ -159,7 +159,7 @@ sequenceDiagram
 | Alembic, uv, Docker Compose | Versioned schema and seed data; one command to run |
 | pytest, testcontainers | Concurrency tests against a real PostgreSQL |
 
-- Rejected: application-level locks, Redis locks, a FIFO queue, serializable isolation as the mechanism, and a separate bay service with a saga (ADR-003, ADR-004).
+- Rejected: application-level locks, Redis locks, a FIFO queue, serializable isolation as the mechanism, and a separate bay service with a saga (ADR-003, ADR-004). The per-dealership advisory lock of the ADR-004 amendment is a PostgreSQL lock, valid across instances, and serialises writers on the booking path; the constraints stay the mechanism.
 - Portability: the guarantee is in the schema; in NestJS or on the JVM the port becomes an interface.
 
 ```mermaid

@@ -107,3 +107,7 @@ TC-39 (D-050): case (a) dealership 100, 2 bays x 1 technician, bypass row on bay
 Gates on the merged branch: `uv run pytest -q` → 109 passed; `uv run mypy src tests/fakes.py` green (also green with tests/test_concurrency.py); `uv run pre-commit run --all-files` green.
 Audit: docs/ai/reviews/SPEC-001-T11-audit.md — pass (cycle 1).
 Open: `barrier_gate` in tests/conftest.py is unused since D-049 (T2's file); remove or document at the final gate. README `OUTPUT-PENDING-T11`, test-table row and Known limitations filled in the next T13 commit.
+
+## T13 (final: README fill, conftest, coherence)
+Commits on leg/t13-final (BASE bba578f): 6a3a0e4 (README: V-002 line, test-table row for TC-20/TC-31/TC-39, Known limitations bullet for the dealership lock, stale race wording), f208fdf (T2: unused `barrier_gate` removed from tests/conftest.py), coherence commit (ADR-004 ordering, capacity and measured-figure notes; design.md rejected-alternatives qualifier; SPEC D-041 item 4 superseded note, booking-sequence gate comment, AC-10 traceability, T2 block note, D-049/D-050 rows dated and ordered).
+Closes the Open lines of T13, D-048 and T11: `OUTPUT-PENDING-T11` filled; `barrier_gate` removed.
