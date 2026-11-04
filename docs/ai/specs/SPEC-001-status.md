@@ -61,3 +61,10 @@ Commits: d7c5827 (wide event middleware and health split), 83d5af3 (an exception
 Tests: `uv run pytest tests/test_events.py tests/test_health.py -q` → 9 passed (TC-32, TC-33).
 Audit: docs/ai/reviews/SPEC-001-T9-audit.md — pass (cycle 3; cycle 1 found the started-response status gap; cycle 2 asked for a squash, declined under the commit protocol).
 Rules fixed: `health.build_router(engine)` accepts any object with an async `connect()` so the interfaces layer imports no SQLAlchemy; the middleware emits only the 17 schema keys, so no handler can leak an email or VIN into the event; `SELECT 1` readiness, any exception → 503.
+
+## T8
+Commits: leg/t8 (T8a HTTP schemas, error mapping, dependencies; T8b appointments router and composition root), 1e2cca6 (T7 fix: `qualified_technicians` inner NOT EXISTS now correlated), b7af954 (audit); merged after this section's status commit.
+Tests: `uv run pytest tests/test_booking_api.py tests/test_idempotency.py -q` → 36 passed (TC-15..19, 21..27, 37); TC-19's event assertion runs for real (T9 merged first, no xfail). Full suite 95 passed.
+Audit: docs/ai/reviews/SPEC-001-T8-audit.md — pass (cycle 1).
+Defect caught by TC-21: an uncorrelated NOT EXISTS in the T7 qualification query made every technician qualified whenever any technician held the skill; fixed in 1e2cca6 (orchestrator-approved fix inside the Contract).
+Rules fixed: `route` and `idempotency_key` are written to the event before ADR-008 steps 2–3 so 400/404/422 events carry the key (ADR-013); `service_type_id` is written after schema validation; error handlers set `code` on every error response.
