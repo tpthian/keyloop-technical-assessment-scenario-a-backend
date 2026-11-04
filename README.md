@@ -129,7 +129,7 @@ make down && make demo # clean rerun on a fresh database
 4. Same key, different body: 422 `replay_conflict`.
 5. Same car (VIN sent in lower case with a space), new key, overlapping 09:30: 409 `vehicle_already_booked`.
 6. Availability for the Oil change on that Monday: windows per pair and `as_of`.
-7. The race: 8 concurrent clients book one slot on the Monday after. Two bays and two technicians allow two concurrent winners, so the expected split is 2 x 201 and 6 x 409 `capacity_exhausted`; one line per client, then the last 8 `book_appointment` events from `docker compose logs api`.
+7. The race: 8 concurrent clients book one slot on the Monday after. Two bays and two technicians allow two winners, so the expected split is 2 x 201 and 6 x 409 `capacity_exhausted`; one line per client, then the last 8 `book_appointment` events from `docker compose logs api`.
 8. The overlap query of design section 5, printed last.
 
 The last printed line is the overlap count and must be `0`. Each response is written to its own file under a temporary directory whose path is printed first. The script stops with a message when a response differs from the expected one, and refuses to run against a database that already holds appointments; `make down && make demo` starts clean.
@@ -157,7 +157,7 @@ The tests start their own PostgreSQL 16 container with testcontainers (ADR-002) 
 | `tests/test_availability.py` | interfaces | Window limits, the ADR-010 worked example, an empty schedule |
 | `tests/test_events.py` | interfaces | One wide event per response, 17 keys in order, `final` classification, no email or VIN in any line |
 | `tests/test_health.py` | interfaces | `/health/live` 200; `/health/ready` 200, and 503 with an unreachable database |
-| `tests/test_concurrency.py` | full stack | V-002: 8 clients released together by a barrier against 4 bays x 4 technicians yield 4 x 201 and 4 x `capacity_exhausted`, distinct winners, 0 overlaps; a parallel same-key pair yields one appointment |
+| `tests/test_concurrency.py` | full stack | V-002: 8 clients released together by a barrier against 4 bays x 4 technicians yield 4 x 201 and 4 x `capacity_exhausted`, distinct winners, 0 overlaps (TC-31); a parallel same-key pair yields one appointment (TC-20); a booking that loses a resource to a writer bypassing the dealership lock prunes it by the constraint name and tries the next candidate (retry fallback, TC-39) |
 
 The race test alone, with its summary line:
 
@@ -166,13 +166,14 @@ TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock uv run pytest tests/t
 ```
 
 ```text
-OUTPUT-PENDING-T11
+V-002: 8 clients, 4 pairs, statuses={201: 4, 409: 4}, attempts=4, deadlocks=0, candidates_pruned=0, max latency_ms=126, wall=129 ms, overlaps=0
 ```
 
-The race asserts the invariant, never a particular SQLSTATE: the test accepts any mix of 23P01 and 40P01 and checks the winner count and the overlap count (L-001). Since bookings of one dealership are serialised behind an advisory lock (ADR-004 amendment), no 40P01 is expected and every loss is a clean 23P01 (L-005).
+The race asserts the invariant, never a particular SQLSTATE: the test accepts any mix of 23P01 and 40P01 and checks the winner count and the overlap count (L-001). Since bookings of one dealership are serialised behind an advisory lock (ADR-004 amendment), no 40P01 is expected: each booking reads the pairs already committed, so a loser finds none free and gets `capacity_exhausted` with zero attempts; the next-candidate retry runs only for a writer that bypasses the lock (TC-39, L-005).
 
 Known limitations:
 
+- Bookings of one dealership are serialised by a transaction-scoped advisory lock taken after the idempotency-key claim (ADR-004 amendment). Before the lock, the exact race split on 4 bays x 4 technicians held in 9 of 20 runs, and races on the seed shape of 2 x 2 saw up to 13 deadlocks with peaks of 1.2 to 1.4 s; with it, the split held in every one of 13 recorded runs, with 0 deadlocks and peaks of about 110 to 126 ms. Ordering is arrival order at the lock, not click order; bookings of different dealerships stay parallel; the next-candidate retry remains the fallback for writers outside the lock (TC-39). Under mass concurrency the throughput limit is the connection pool (10 plus 10 overflow per instance), not the lock.
 - No request-level deadline: the latency budget bounds deadlock waits only (ADR-004).
 - `statement_timeout` (2 s) bounds one statement, not the request.
 - A vehicle booked once by VIN and once by vehicle `id` gets two `vehicle_key` values, so `no_vehicle_overlap` does not catch that overlap (ADR-007).
