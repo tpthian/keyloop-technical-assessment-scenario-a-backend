@@ -153,15 +153,15 @@ The tests start their own PostgreSQL 16 container with testcontainers (ADR-002) 
 | `tests/test_canonical.py` | domain | The request hash ignores key order, whitespace, null fields and VIN spacing, and uses the UTC instant |
 | `tests/test_attempts.py` | domain | Pruning by constraint name, 40P01 prunes nothing and the same pair is retried within the bound of 5, the bound gives `contention`, an empty list gives `capacity_exhausted` |
 | `tests/test_windows.py` | domain | Busy ranges merged, free gaps, duration subtracted on UTC instants, closing bound `closes - 1 min` |
-| `tests/test_book_appointment_usecase.py` | application | The booking use case on in-memory fakes: replay, `replay_conflict`, business 422 recorded, scripted reserve outcomes, `contention` rolled back with nothing recorded |
-| `tests/test_postgres_adapters.py` | infrastructure | `reserve` maps 23P01 to `ResourceTaken` and the transaction continues after the savepoint; `claim`, `record`, `free_candidates` |
+| `tests/test_book_appointment_usecase.py` | application | The booking use case on in-memory fakes: replay, `replay_conflict`, business 422 recorded, scripted reserve outcomes, `contention` rolled back with nothing recorded, the dealership lock taken after the claim and never on a replay |
+| `tests/test_postgres_adapters.py` | infrastructure | `reserve` maps 23P01 to `ResourceTaken` and the transaction continues after the savepoint, and re-raises any other error; `claim`, `record`, `free_candidates`; `serialise` holds the dealership's advisory lock until COMMIT |
 | `tests/test_seed.py` | infrastructure | The seed and the nine named constraints, `btree_gist` installed |
 | `tests/test_booking_api.py` | interfaces | 201 body, business 422s, `vehicle_already_booked`, `capacity_exhausted`, tenancy foreign keys, `GET` by id, back-to-back slots |
 | `tests/test_idempotency.py` | interfaces | Every row of the ADR-008 boundary, including the order 400, 404, then schema 422 |
 | `tests/test_availability.py` | interfaces | Window limits, the ADR-010 worked example, an empty schedule |
 | `tests/test_events.py` | interfaces | One wide event per response, 17 keys in order, `final` classification, no email or VIN in any line |
 | `tests/test_health.py` | interfaces | `/health/live` 200; `/health/ready` 200, and 503 with an unreachable database |
-| `tests/test_concurrency.py` | full stack | V-002: 8 clients released together by a barrier against 4 bays x 4 technicians yield 4 x 201 and 4 x `capacity_exhausted`, distinct winners, 0 overlaps (TC-31); a parallel same-key pair yields one appointment (TC-20); a booking that loses a resource to a writer bypassing the dealership lock prunes it by the constraint name and tries the next candidate (retry fallback, TC-39) |
+| `tests/test_concurrency.py` | full stack | V-002: 8 clients released together by a barrier against 4 bays x 4 technicians yield 4 x 201 and 4 x `capacity_exhausted`, distinct winners, 0 overlaps (TC-31); a parallel same-key pair yields one appointment (TC-20); a booking that loses a bay to a writer bypassing the dealership lock prunes it by the constraint name and lands on the remaining free bay, or gets `capacity_exhausted` when none is left (retry fallback, TC-39) |
 
 The race test alone, with its summary line:
 
@@ -177,8 +177,8 @@ The race asserts the invariant, never a particular SQLSTATE: the test accepts an
 
 Known limitations:
 
-- Bookings of one dealership are serialised by a transaction-scoped advisory lock taken after the idempotency-key claim (ADR-004 amendment). Before the lock, the exact race split on 4 bays x 4 technicians held in 9 of 20 runs, and races on the seed shape of 2 x 2 saw up to 13 deadlocks with peaks of 1.2 to 1.4 s; with it, the split held in all 19 recorded runs (3 + 10 + 6), with 0 deadlocks and peaks of 108 to 126 ms in the 13 runs whose figures were kept. Bookings are taken in the order they reach the lock, not click order, and no user-visible ordering guarantee is made; bookings of different dealerships stay parallel; the next-candidate retry remains the fallback for writers outside the lock (TC-39). Under mass concurrency the expected throughput limit is the connection pool (10 plus 10 overflow per instance), not the lock; this is a sizing expectation, not a load-tested figure.
-- No request-level deadline: the latency budget bounds deadlock waits only (ADR-004).
+- Bookings of one dealership are serialised by a transaction-scoped advisory lock taken after the idempotency-key claim (ADR-004 amendment). Before the lock, the exact race split on 4 bays x 4 technicians held in 9 of 20 runs, and races on the seed shape of 2 x 2 saw up to 13 deadlocks with peaks of 1.2 to 1.4 s; with it, the split held in all 19 recorded runs (3 + 10 + 6), with 0 deadlocks and peaks of 108 to 126 ms in the 13 runs whose figures were kept. Bookings are taken in the order they reach the lock, not click order, and no user-visible ordering guarantee is made; bookings of different dealerships stay parallel; the next-candidate retry remains the fallback for writers outside the lock (TC-39). Hypothesis, not load-tested: under mass concurrency the throughput limit is the connection pool (10 plus 10 overflow per instance), not the lock.
+- No request-level deadline: the latency budget of ADR-004 is an SLO allocation, not enforced; a booking waiting on the dealership lock is bounded only by the 2 s `statement_timeout` of the lock statement, which ends it as a 500.
 - `statement_timeout` (2 s) bounds one statement, not the request.
 - A vehicle booked once by VIN and once by vehicle `id` gets two `vehicle_key` values, so `no_vehicle_overlap` does not catch that overlap (ADR-007).
 - Opening hours and the seed change by migration only; there is no admin API (ADR-009, ADR-012).
