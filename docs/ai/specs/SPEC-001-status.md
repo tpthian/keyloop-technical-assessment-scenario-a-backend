@@ -55,3 +55,9 @@ Commits: 50ba998 (T7a reserve adapter), a974d42 (T7b read, idempotency adapters 
 Tests: `uv run pytest tests/test_postgres_adapters.py -q` → 4 passed (TC-12 x2, TC-13, end-to-end BookAppointment against PostgreSQL).
 Audit: docs/ai/reviews/SPEC-001-T7-audit.md — pass (cycle 1).
 Notes: the read repository also carries `bays`, `busy_ranges`, `watermark` (the Protocol requires all methods for structural typing), so T10b adds no repository code.
+
+## T9
+Commits: d7c5827 (wide event middleware and health split), 83d5af3 (an exception after the response started now records 500 `error`, not final), 106d78b (audit); merged after this section's status commit.
+Tests: `uv run pytest tests/test_events.py tests/test_health.py -q` → 9 passed (TC-32, TC-33).
+Audit: docs/ai/reviews/SPEC-001-T9-audit.md — pass (cycle 3; cycle 1 found the started-response status gap; cycle 2 asked for a squash, declined under the commit protocol).
+Rules fixed: `health.build_router(engine)` accepts any object with an async `connect()` so the interfaces layer imports no SQLAlchemy; the middleware emits only the 17 schema keys, so no handler can leak an email or VIN into the event; `SELECT 1` readiness, any exception → 503.
