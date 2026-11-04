@@ -75,3 +75,16 @@ Tests: `uv run pytest tests/test_availability.py -q` → 10 passed (TC-28, TC-29
 Audit: docs/ai/reviews/SPEC-001-T10b-audit.md — pass (cycle 2).
 Rules fixed where the SPEC was silent: days are `[from, to)` and the horizon is checked on the exclusive `to`; the busy-range read spans first opening to last closing plus duration; no bay, no qualified technician or no open day → 200 with empty windows. TC-30 read as `[opens, closes - 1 min]` on every open day regardless of duration (consistent with AC-06).
 Deviation: `AvailabilityOut`/`WindowOut` live in `availability.py` (T8a owns `schemas.py`); relocation to `schemas.py` is a follow-up commit before the final audit.
+
+## T12
+Commits: dc353b1 (demo script, compose api migrates on start, make demo), plus verification commits on leg/t12-t13-verify (race clients start behind a barrier; unbuffered api stdout; temp path), audit; merged 3df7f82.
+TC-35: `make down && make demo` on the merged branch (T10b included) → exit 0; sections 1–8 as specified; race 2 x 201 + 6 x `capacity_exhausted`; last line `0`. Output: runbook `raw/legs/T12-demo-output-merged.txt` (private evidence copy; the README describes the run).
+Audit: docs/ai/reviews/SPEC-001-T12-audit.md — pass (cycle 1).
+Retired: the spike container `kl-spike-pg`.
+
+## T13
+Commits: 9e95aa0 (CI on testcontainers, README API/demo/testing sections), 8e1a964 (CI mypy step covers tests/fakes.py), audit; merged 3df7f82.
+TC-36 / local CI equivalent (D-045): `uv run pre-commit run --all-files` green; `uv run mypy src tests/fakes.py` green; `uv run pytest -q` → 104 passed on the merged branch; `.github/workflows/ci.yml` runs exactly those, no database service, no DATABASE_URL.
+TC-38: `grep -Ec '^## (API|Running the demo|Testing)$' README.md` → 3; line 3 reads `Status: implemented; see Testing for the evidence.`; `git diff -U0 master -- README.md | grep '^@@'` → hunks at line 3 and inside the three sections only.
+Audit: docs/ai/reviews/SPEC-001-T13-audit.md — pass (cycle 2).
+Open: README placeholder `OUTPUT-PENDING-T11` is filled at the T11 merge (D-048 pending).

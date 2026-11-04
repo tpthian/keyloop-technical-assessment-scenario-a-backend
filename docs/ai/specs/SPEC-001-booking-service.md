@@ -831,3 +831,4 @@ Done when: `make lint && make test` green; the local CI equivalent recorded in t
 |---|---|---|---|
 | 2026-11-04 | JP (D-044) | TC-31/T11: race test uses its own fixture of 4 bays x 4 technicians; demo race expects 2 winners against the seed | Codex plan review: seed 2x2 cannot yield 4 concurrent winners |
 | 2026-11-04 | JP (D-045) | T13 done-when: local CI equivalent recorded; GitHub CI after the authorised push | No-push rule during the overnight run |
+| 2026-11-04 | orchestrator (Execution) | TC-38 heading check uses `grep -Ec '^## (API|Running the demo|Testing)$' README.md` (prints 3 on GNU and BSD grep); T13 paths gain `Makefile` (test target exports the testcontainers socket override) and the CI mypy step is `uv run mypy src tests/fakes.py` (AC-15 requires the fakes to type-check); T12 compose change includes `PYTHONUNBUFFERED=1` on `api` so event lines reach `docker compose logs` | T12/T13 verification findings |
