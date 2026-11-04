@@ -6,16 +6,15 @@ engine (SQLAlchemy 2 asyncio + psycopg) on that database; rows the tests write a
 before and after every test, while reference rows below id 100 (the seed, T3) are kept.
 
 Helpers for later test modules (import them from ``tests.conftest``): ``make_dealership``,
-``booking_body``, ``overlap_count``, ``barrier_gate``.
+``booking_body``, ``overlap_count``.
 """
 
 from __future__ import annotations
 
-import asyncio
 import os
 import subprocess
 import sys
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from datetime import time
 from pathlib import Path
 from typing import Any
@@ -174,18 +173,3 @@ async def overlap_count(engine: AsyncEngine) -> int:
     """The overlap SQL of design §5: committed appointments sharing a resource in time."""
     async with engine.connect() as conn:
         return int((await conn.execute(text(OVERLAP_SQL))).scalar_one())
-
-
-def barrier_gate(n: int, timeout_s: float = 10.0) -> Callable[[], Awaitable[None]]:
-    """An ``AttemptGate`` releasing ``n`` bookings together before their first reserve.
-
-    Raises ``TimeoutError`` after ``timeout_s`` if fewer than ``n`` arrive, so a broken test
-    fails instead of hanging.
-    """
-    barrier = asyncio.Barrier(n)
-
-    async def gate() -> None:
-        async with asyncio.timeout(timeout_s):
-            await barrier.wait()
-
-    return gate
