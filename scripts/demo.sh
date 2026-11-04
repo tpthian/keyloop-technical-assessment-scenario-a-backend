@@ -47,7 +47,8 @@ monday = today + dt.timedelta(days=7 - today.weekday())
 print(monday, monday + dt.timedelta(days=1), monday + dt.timedelta(days=7))
 ')"
 
-OUT="$(mktemp -d "${TMPDIR:-/tmp}/scheduler-demo.XXXXXX")"
+TMP_ROOT="${TMPDIR:-/tmp}"
+OUT="$(mktemp -d "${TMP_ROOT%/}/scheduler-demo.XXXXXX")"
 echo "Responses are written to $OUT"
 
 section() {
