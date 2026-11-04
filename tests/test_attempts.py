@@ -8,14 +8,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from scheduler.domain.attempts import (
-    RETRY_BOUND,
-    AttemptResult,
-    Candidate,
-    Confirmed,
-    ResourceTaken,
-    run_attempts,
-)
+from scheduler.domain.attempts import RETRY_BOUND, AttemptResult, run_attempts
+from scheduler.domain.model import Candidate, Confirmed, ResourceTaken
 
 DEADLOCK = ResourceTaken(None, deadlock=True)
 

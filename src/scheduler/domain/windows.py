@@ -26,29 +26,14 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from zoneinfo import ZoneInfo
+
+from scheduler.domain.model import Dealership
+from scheduler.domain.time_rules import day_window_utc
 
 Interval = tuple[dt.datetime, dt.datetime]
 """Half-open ``[start, end)`` on aware UTC instants."""
 
 ONE_MINUTE = dt.timedelta(minutes=1)
-
-
-# moved to model.py at merge (T4 owns model.py)
-@dataclass(frozen=True)
-class Hours:
-    weekday: int  # 0 = Monday
-    opens_at: dt.time
-    closes_at: dt.time
-
-
-# moved to model.py at merge (T4 owns model.py)
-@dataclass(frozen=True)
-class Dealership:
-    id: int
-    name: str
-    zone: ZoneInfo
-    hours: Mapping[int, Hours]  # missing weekday = closed
 
 
 @dataclass(frozen=True)
@@ -100,14 +85,6 @@ def free(busy: Iterable[Interval], lo: dt.datetime, hi: dt.datetime) -> list[Int
     return gaps
 
 
-# replaced by time_rules.day_window_utc at merge (T4 owns time_rules.py)
-def _day_window_utc(day: dt.date, hours: Hours, zone: ZoneInfo) -> Interval:
-    """Opening and closing instants of a local day in UTC (wall time, first occurrence)."""
-    opens = dt.datetime.combine(day, hours.opens_at, tzinfo=zone).astimezone(dt.UTC)
-    closes = dt.datetime.combine(day, hours.closes_at, tzinfo=zone).astimezone(dt.UTC)
-    return opens, closes
-
-
 def _ceil_minute(instant: dt.datetime) -> dt.datetime:
     """The first whole-minute instant at or after ``instant`` (starts are whole minutes)."""
     floored = instant.replace(second=0, microsecond=0)
@@ -147,7 +124,7 @@ def start_windows(
         hours = dealership.hours.get(day.weekday())
         if hours is None:
             continue
-        opens, closes = _day_window_utc(day, hours, dealership.zone)
+        opens, closes = day_window_utc(day, hours, dealership.zone)
         last_start_of_day = closes - ONE_MINUTE
         first_start_of_day = max(opens, not_before)
         if first_start_of_day > last_start_of_day:
