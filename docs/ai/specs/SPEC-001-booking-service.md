@@ -88,7 +88,7 @@ Secondary impacts: `pyproject.toml` gains `greenlet` (explicit) and `sqlalchemy[
 
 Facts:
 - Compose and CI database roles are superusers (official image, `POSTGRES_USER`), so `SET LOCAL deadlock_timeout` works with or without the GRANT; the GRANT documents the production requirement.
-- `race_savepoint.py` exits 2 when no 40P01 appears; the implementation test never requires 40P01 (ERR-435).
+- `race_savepoint.py` exits 2 when no 40P01 appears; the implementation test never requires 40P01 (`docs/ai/lessons.md` L-001).
 - The ADR-010 worked example is dated 2027-03-26, beyond 90 days from today; the clock is a port, so tests fix "now" at the example's issue time, 2027-03-25T16:00:00Z.
 
 Decided at the human gate (D-041, 2026-11-04):
@@ -263,7 +263,7 @@ Touches only this repository. Rollback: revert the branch merge; no migration ru
 
 ## § Execution
 
-Known traps (ops lessons): ERR-435 the barrier test at low N rarely produces 40P01; assert the invariant, accept either SQLSTATE. ERR-436 evidence runs with the production retry policy (bound 5, 100 ms deadlock timeout). ERR-437 `ls` is aliased to `eza` in non-interactive shells on the author's machine; use `[ -f path ]`. ERR-438 SQLAlchemy asyncio needs greenlet. LSN-slotbetter-041 never write a value a CHECK refuses (`weekday` 0..6).
+Known traps (`docs/ai/lessons.md`): L-001 the barrier test at low N rarely produces 40P01; assert the invariant, accept either SQLSTATE. L-002 evidence runs with the production retry policy (bound 5, 100 ms deadlock timeout). L-003 SQLAlchemy asyncio needs greenlet. L-004 never write a value a CHECK refuses (`weekday` 0..6).
 
 Commit protocol (D-040): one task is one or more commits; each commit reviewable in one sitting (diff in the low hundreds of lines); message form `SPEC-001 T<n>: <what> (design §<n>, ADR-<nnn>)` plus the attribution line; never push until the author says so; history kept. Every task ends with `uv run pre-commit run --all-files` green and `uv run mypy src` green. The implementation status file is `docs/ai/specs/SPEC-001-status.md` (per-task commit hashes, `V-002:` lines, demo output, deviations, additions, doc changes needed in No-Touch files); `Status: awaiting-audit` when done.
 
@@ -767,7 +767,7 @@ The test, given in full because its assertions are the evidence:
 
 ```python
 async def test_v002_race_eight_clients_four_pairs(engine, capsys) -> None:
-    """Production retry policy (bound 5, deadlock_timeout 100 ms); either SQLSTATE accepted (ERR-435)."""
+    """Production retry policy (bound 5, deadlock_timeout 100 ms); either SQLSTATE accepted (L-001)."""
     await make_dealership(engine, 100, bays=[100, 101], technicians={100: [1], 101: [1]})
     n = 8
     app = create_app(engine=engine, clock=FixedClock(FIXED_NOW), attempt_gate=barrier_gate(n))
@@ -822,7 +822,7 @@ Done when: TC-35 recorded in the status file. Commit: `SPEC-001 T12: demo script
 
 **T13: CI, README, gates** (design §6 pointer only)
 Paths: `.github/workflows/ci.yml` (remove the postgres service and `DATABASE_URL`), `README.md` sections "API", "Running the demo", "Testing" and the status line (line 3 becomes `Status: implemented; see Testing for the evidence.`).
-"API": the five endpoints, the `Idempotency-Key` rule, the request and 201 example, the error body and the code table, Swagger at `/docs`. "Running the demo": `make demo`, the eight sections, last line `0`, clean rerun. "Testing": `make test` (Docker required), one line per test file and what it proves, the race test alone with output, the ERR-435 rule, "Known limitations": no request-level deadline; `statement_timeout` is per statement; a vehicle by VIN once and by id once yields two keys; hours and seed change by migration; the compose role is a superuser so the GRANT is documentary; no key cleanup job (SQL given).
+"API": the five endpoints, the `Idempotency-Key` rule, the request and 201 example, the error body and the code table, Swagger at `/docs`. "Running the demo": `make demo`, the eight sections, last line `0`, clean rerun. "Testing": `make test` (Docker required), one line per test file and what it proves, the race test alone with output, the L-001 rule, "Known limitations": no request-level deadline; `statement_timeout` is per statement; a vehicle by VIN once and by id once yields two keys; hours and seed change by migration; the compose role is a superuser so the GRANT is documentary; no key cleanup job (SQL given).
 Done when: `make lint && make test` green; the local CI equivalent recorded in the status file (`uv run pre-commit run --all-files`, `uv run mypy src`, `uv run pytest -q`, and `.github/workflows/ci.yml` inspected to run exactly those); GitHub CI runs after the push is authorised (D-045); TC-38's three commands recorded in the status file; status file at `Status: awaiting-audit`. Commit: `SPEC-001 T13: CI on testcontainers, README API, demo and testing sections (design §3, §5)`.
 
 ### Scope Amendments
