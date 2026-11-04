@@ -16,5 +16,5 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
       - run: uv run pre-commit run --all-files
-      - run: uv run mypy src
+      - run: uv run mypy src tests/fakes.py
       - run: uv run pytest -q

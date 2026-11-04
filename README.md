@@ -140,7 +140,7 @@ The last printed line is the overlap count and must be `0`. Each response is wri
 make test   # uv run pytest -q; Docker required
 ```
 
-The tests start their own PostgreSQL 16 container with testcontainers (ADR-002) and migrate it with `alembic upgrade head`, as `make migrate` does; no compose database is needed. With colima or Docker Desktop, testcontainers needs the in-VM socket path for its reaper container: `make test` sets `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`; when running `uv run pytest` directly, export it first. CI runs `uv run pre-commit run --all-files`, `uv run mypy src` and `uv run pytest -q` on the runner's Docker, with no database service.
+The tests start their own PostgreSQL 16 container with testcontainers (ADR-002) and migrate it with `alembic upgrade head`, as `make migrate` does; no compose database is needed. With colima or Docker Desktop, testcontainers needs the in-VM socket path for its reaper container: `make test` sets `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`; when running `uv run pytest` directly, export it first. CI runs `uv run pre-commit run --all-files`, `uv run mypy src tests/fakes.py` (the fakes checked against the Protocols) and `uv run pytest -q` on the runner's Docker, with no database service.
 
 | Test file | Layer | Proves |
 |---|---|---|
