@@ -1,8 +1,8 @@
 # SPEC: SPEC-001 — Booking service: clean-architecture implementation of the design
 
-Status: awaiting-approval
-Gate: spec
-Set-By: claude
+Status: approved
+Gate: implementation
+Set-By: jp
 Set-At: 2026-11-04T16:50:00+07:00
 Version: 3 — contract revision (2026-11-04). Reason: ADR-008 request order restored at the HTTP boundary (dealership load before schema validation); v2 rewrote the SPEC to the implementation shape of D-039/D-041 (four layers, Protocol ports, written for engineers); v1 was a layered script.
 Operation-Type: new_feature (secondary: data_model_change, devops_change)
