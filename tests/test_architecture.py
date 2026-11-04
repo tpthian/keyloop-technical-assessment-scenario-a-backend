@@ -38,7 +38,11 @@ def _imports(path: Path) -> set[str]:
         if isinstance(node, ast.Import):
             names.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            names.add(node.module)
+            if node.module == PACKAGE:
+                # `from scheduler import infrastructure` is an edge to scheduler.infrastructure
+                names.update(f"{PACKAGE}.{alias.name}" for alias in node.names)
+            else:
+                names.add(node.module)
     return names
 
 
@@ -99,9 +103,10 @@ def test_rules_catch_violations(tmp_path: Path) -> None:
     (src / "nested" / "main.py").write_text(
         "import scheduler.infrastructure\nimport scheduler.interfaces\n"
     )
+    (src / "nested" / "aliased.py").write_text("from scheduler import infrastructure, interfaces\n")
     (src / "main.py").write_text("import scheduler.infrastructure\nimport scheduler.interfaces\n")
     assert _violations(src) == [
         "application/bad.py: application -> scheduler.infrastructure",
         "domain/bad.py: domain -> third-party fastapi",
     ]
-    assert _both_outer_layers(src) == ["nested/main.py"]
+    assert _both_outer_layers(src) == ["nested/aliased.py", "nested/main.py"]
