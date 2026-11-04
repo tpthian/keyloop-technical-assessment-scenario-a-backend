@@ -155,12 +155,14 @@ class PostgresSchedulingReadRepository:
             select(service_type_required_skill.c.skill_id)
             .where(service_type_required_skill.c.service_type_id == service_type_id)
             .where(
-                ~exists().where(
+                ~exists()
+                .where(
                     and_(
                         technician_skill.c.technician_id == technician.c.id,
                         technician_skill.c.skill_id == service_type_required_skill.c.skill_id,
                     )
                 )
+                .correlate(technician, service_type_required_skill)  # both from outer queries
             )
         )
         stmt = (
