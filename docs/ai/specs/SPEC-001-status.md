@@ -9,7 +9,7 @@ Each task appends one section: commits, test command and result line, audit file
 ## T1
 Commits: a919ea6 (deps, skeleton, test), ca49db0, 1d24569 and one later fix (architecture-scan gaps found by Codex cycles 1–3: nested main.py, package-root aliases, relative imports).
 Tests: `uv run pytest tests/test_architecture.py -q` → 3 passed.
-Audit: docs/ai/reviews/SPEC-001-T1-audit.md — cycles 1–3 revise (distinct findings each), cycle 4 pending.
+Audit: docs/ai/reviews/SPEC-001-T1-audit.md — pass (cycle 4; cycles 1–3 each found a distinct scan gap, all fixed in new commits).
 Deviation: audit exceeded the 3-cycle bound by one, orchestrator exception (each cycle raised a new gap, none repeated).
 
 ## T2
