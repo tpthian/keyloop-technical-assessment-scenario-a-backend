@@ -3,18 +3,26 @@
 ``BookingRequest`` is validated explicitly by the booking handler after the dealership is
 loaded (ADR-008 step 3), never by FastAPI before the handler runs. ``to_command`` is the one
 mapping from the wire model to the domain ``BookingCommand``; the duplication between the two
-shapes is accepted (D-041). ``AppointmentOut`` and ``ErrorOut`` document the bodies in
-``/docs``; the handlers return the presenter's dict, so nothing is re-serialised through them.
+shapes is accepted (D-041). ``AppointmentOut``, ``AvailabilityOut`` and ``ErrorOut`` document the
+bodies in ``/docs``; the handlers return the presenter's or use case's dict, so nothing is
+re-serialised through them.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, NaiveDatetime, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NaiveDatetime,
+    field_validator,
+    model_validator,
+)
 
 from scheduler.domain import model as domain
 from scheduler.domain.canonical import normalise_vin
@@ -125,6 +133,27 @@ class AppointmentOut(BaseModel):
     timezone: str
     customer: CustomerOut
     vehicle: VehicleOut
+
+
+class Window(BaseModel):
+    """One pair's inclusive start window on one local day; instants in UTC with ``Z``."""
+
+    bay_id: int
+    technician_id: int
+    date: date
+    earliest_start: datetime
+    latest_start: datetime
+
+
+class AvailabilityOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    dealership_id: int
+    service_type_id: int
+    from_: date = Field(alias="from")
+    to: date
+    as_of: datetime  # data watermark (ADR-010), not the response time
+    windows: list[Window]
 
 
 class ErrorItem(BaseModel):
