@@ -49,3 +49,9 @@ Commits: leg/t6 (T6a ports and outcomes; T6b BookAppointment use case with fakes
 Tests: `uv run pytest tests/test_book_appointment_usecase.py tests/test_architecture.py -q` → 17 passed (TC-09, TC-10, TC-11), no database. `uv run mypy src tests/fakes.py` green.
 Audit: docs/ai/reviews/SPEC-001-T6-audit.md — pass (cycle 1).
 Rules fixed: a replayed 201 carries the stored bay and technician in the Outcome (ADR-013: null only when not a 201); a claimed key row with no recorded outcome raises and becomes a 5xx (cannot occur for a committed row). Note for T7: the unit of work declares `appointments`, `idempotency`, `reads` with the port types, not the adapter classes.
+
+## T7
+Commits: 50ba998 (T7a reserve adapter), a974d42 (T7b read, idempotency adapters and unit of work), audit commit; merged after this section's status commit. Written inline by the orchestrator (leg cap), same contract and audit.
+Tests: `uv run pytest tests/test_postgres_adapters.py -q` → 4 passed (TC-12 x2, TC-13, end-to-end BookAppointment against PostgreSQL).
+Audit: docs/ai/reviews/SPEC-001-T7-audit.md — pass (cycle 1).
+Notes: the read repository also carries `bays`, `busy_ranges`, `watermark` (the Protocol requires all methods for structural typing), so T10b adds no repository code.
