@@ -162,7 +162,7 @@ jq -r '"as_of \(.as_of)",
     + " \(.earliest_start) .. \(.latest_start)")' "$OUT/availability.json"
 
 section "7. Race: $RACE_CLIENTS clients, one slot, Monday $RACE_MONDAY 09:00"
-echo "2 bays x 2 technicians allow 2 concurrent winners;" \
+echo "2 bays x 2 technicians allow 2 winners;" \
   "expected 2 x 201 and 6 x 409 capacity_exhausted"
 # Bodies and keys are built first: building them spawns jq and python3, which takes longer
 # than one booking, so building inside the launch loop would serialise the clients. Each
