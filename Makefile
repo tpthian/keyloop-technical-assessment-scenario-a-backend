@@ -1,4 +1,4 @@
-.PHONY: install up down run test lint migrate spike
+.PHONY: install up down run test lint migrate demo spike
 
 install:
 	uv sync
@@ -18,6 +18,10 @@ test:
 
 lint:
 	uv run pre-commit run --all-files
+
+demo:
+	docker compose up -d --build --wait db api
+	scripts/demo.sh
 
 migrate:
 	uv run alembic upgrade head
