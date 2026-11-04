@@ -31,18 +31,25 @@ def _layer_of(path: Path) -> str:
     return rel.parts[0] if len(rel.parts) > 1 else rel.stem  # top-level module -> its own name
 
 
-def _imports(path: Path) -> set[str]:
+def _imports(path: Path, src: Path = SRC) -> set[str]:
+    """Absolute module names imported by ``path``; relative imports are resolved to absolute."""
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    package_parts = [PACKAGE, *path.relative_to(src).parent.parts]
     names: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             names.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            if node.module == PACKAGE:
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                base = package_parts[: len(package_parts) - (node.level - 1)]
+                module = ".".join([*base, *([node.module] if node.module else [])])
+            else:
+                module = node.module or ""
+            if module == PACKAGE:
                 # `from scheduler import infrastructure` is an edge to scheduler.infrastructure
                 names.update(f"{PACKAGE}.{alias.name}" for alias in node.names)
-            else:
-                names.add(node.module)
+            elif module:
+                names.add(module)
     return names
 
 
@@ -57,7 +64,7 @@ def _violations(src: Path = SRC) -> list[str]:
         layer = _layer_of_in(path, src)
         if layer not in ALLOWED_INTERNAL:
             continue  # main.py, settings.py and the package root are the composition root
-        for name in _imports(path):
+        for name in _imports(path, src):
             root = name.split(".")[0]
             if root == PACKAGE:
                 parts = name.split(".")
@@ -76,7 +83,7 @@ def _both_outer_layers(src: Path = SRC) -> list[str]:
     for path in sorted(src.rglob("*.py")):
         if path == composition_root:
             continue
-        names = _imports(path)
+        names = _imports(path, src)
         if any(n.startswith("scheduler.infrastructure") for n in names) and any(
             n.startswith("scheduler.interfaces") for n in names
         ):
@@ -100,6 +107,7 @@ def test_rules_catch_violations(tmp_path: Path) -> None:
     (src / "nested").mkdir()
     (src / "domain" / "bad.py").write_text("import fastapi\n")
     (src / "application" / "bad.py").write_text("from scheduler.infrastructure import x\n")
+    (src / "application" / "rel.py").write_text("from ..infrastructure import adapter\n")
     (src / "nested" / "main.py").write_text(
         "import scheduler.infrastructure\nimport scheduler.interfaces\n"
     )
@@ -107,6 +115,7 @@ def test_rules_catch_violations(tmp_path: Path) -> None:
     (src / "main.py").write_text("import scheduler.infrastructure\nimport scheduler.interfaces\n")
     assert _violations(src) == [
         "application/bad.py: application -> scheduler.infrastructure",
+        "application/rel.py: application -> scheduler.infrastructure",
         "domain/bad.py: domain -> third-party fastapi",
     ]
     assert _both_outer_layers(src) == ["nested/aliased.py", "nested/main.py"]
