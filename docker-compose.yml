@@ -17,6 +17,8 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql+psycopg://scheduler:scheduler@db:5432/scheduler
+      # Event lines go to stdout; unbuffered so they reach `docker compose logs` at once.
+      PYTHONUNBUFFERED: "1"
     ports:
       - "8000:8000"
     depends_on:
