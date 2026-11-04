@@ -202,7 +202,7 @@ Wide event, one JSON line on stdout per request, keys in this order: `v, ts, req
 - AC-04 Idempotency boundary: every row of the ADR-008 table holds: 400 for malformed JSON or a non-UUID key, 404 unknown dealership, schema 422 never stored; business 422, 201 and final 409 stored and replayed; same key different body → 422 `replay_conflict`; concurrent same key → one appointment, identical answers.
 - AC-05 Time: start outside hours, in the past, beyond 90 days, or in a DST gap → 422 stored; a repeated local time takes the first occurrence; a 4,320-minute service from Fri 2027-03-26 09:00 London ends 2027-03-29T09:00:00Z; `pickup_from` equals `end_at` when inside hours, else the next opening instant, skipping closed days.
 - AC-06 Availability: the ADR-010 worked example returns exactly Friday `[09:00Z, 11:00Z]` and Monday `[13:00Z, 16:59Z]` for the one pair; windows over 14 days or outside the horizon → 422; response carries `as_of`.
-- AC-07 Concurrency (V-002): 8 concurrent bookings of one slot at a dealership with 2 bays × 2 technicians, released together by a barrier, yield exactly 4 × 201 and 4 × 409 `capacity_exhausted`, distinct bays and technicians among winners, 8 committed key rows, overlap count 0, whatever mix of 23P01 and 40P01 occurred.
+- AC-07 Concurrency (V-002): 8 concurrent bookings of one slot at a dealership with 4 bays × 4 qualified technicians (test-owned fixture, D-044), the clients released together by a barrier before they send (D-049), yield exactly 4 × 201 and 4 × 409 `capacity_exhausted`, distinct bays and technicians among winners, 8 committed key rows, overlap count 0, whatever mix of 23P01 and 40P01 occurred.
 - AC-08 Tenancy: an appointment referencing a bay or technician of another dealership is refused by the database; a dealership with no bays gets `capacity_exhausted`; with no qualified technician, 422.
 - AC-09 Health: `/health/live` 200 always; `/health/ready` 200 with the database and 503 without.
 - AC-10 Event: every response emits exactly one JSON line with the 17 keys in order; a booking line carries `attempts`, `deadlocks`, `candidates_pruned`, `replay`, `final`; no line contains an email, VIN or `vehicle_key`.
@@ -248,7 +248,7 @@ Edge and regression first, happy path last. Layer in the fourth column.
 | TC-28 | Availability: 15-day window → 422; `to <= from` → 422; `to` beyond horizon → 422; unknown service type → 422; unknown dealership → 404 | AC-06 | test_availability.py |
 | TC-29 | Availability worked example (London, 72 h, E1, E2, clock 2027-03-25T16:00Z): exactly the two windows of AC-06; `as_of` aware UTC | AC-06 | test_availability.py |
 | TC-30 | Availability with no appointments: every open day `[opens, closes - 1 min]` shifted by the duration at the right end; Sunday absent | AC-06 | test_availability.py |
-| TC-31 | V-002 race: 8 clients against a test-owned fixture of 4 bays and 4 qualified technicians (the seed's 2x2 allows only 2 concurrent winners; D-044), barrier; statuses {201: 4, 409: 4}; winners distinct; overlap 0; 8 key rows all recorded; events' `attempts` sum ≥ 8; elapsed printed | AC-07, AC-10 | test_concurrency.py |
+| TC-31 | V-002 race: 8 clients against a test-owned fixture of 4 bays and 4 qualified technicians (the seed's 2x2 allows only 2 concurrent winners; D-044); the clients wait on an `asyncio.Barrier(8)` and send together, no attempt gate (the bookings queue on the dealership lock; D-049); statuses {201: 4, 409: 4}; winners distinct; overlap 0; 8 key rows all recorded; events' `attempts` sum ≥ 8; elapsed printed | AC-07, AC-10 | test_concurrency.py |
 | TC-32 | Event schema: one line per response, 17 keys in order, `v == 1`; `final` true for 201, final 409 and 422, false for `contention`; health lines carry null booking fields; no `@` and no VIN substring in any line | AC-10 | test_events.py |
 | TC-33 | `/health/live` 200; `/health/ready` 200; with an engine on a closed port, 503 | AC-09 | test_health.py |
 | TC-34 | Seed: 2 dealerships, 3 service types (one 4,320 min), dealership 1 has 2 bays and 2 technicians, both hold `general`, only technician 1 holds `bodywork`; `btree_gist` installed; the nine named constraints exist | AC-01 | test_seed.py |
@@ -772,15 +772,25 @@ The test, given in full because its assertions are the evidence:
 
 ```python
 async def test_v002_race_eight_clients_four_pairs(engine, capsys) -> None:
-    """Production retry policy (bound 5, deadlock_timeout 100 ms); either SQLSTATE accepted (L-001)."""
-    await make_dealership(engine, 100, bays=[100, 101], technicians={100: [1], 101: [1]})
+    """Production retry policy (bound 5, deadlock_timeout 100 ms); either SQLSTATE accepted (L-001).
+
+    The clients are released together by a barrier before they send (D-049); inside the service
+    the bookings of the dealership queue on the advisory lock (ADR-004 amendment, D-048), so no
+    attempt gate is injected and no 40P01 is expected.
+    """
+    await make_dealership(
+        engine, 100, bays=[100, 101, 102, 103], technicians={100: [1], 101: [1], 102: [1], 103: [1]}
+    )
     n = 8
-    app = create_app(engine=engine, clock=FixedClock(FIXED_NOW), attempt_gate=barrier_gate(n))
+    app = create_app(engine=engine, clock=FixedClock(FIXED_NOW))
+    start = asyncio.Barrier(n)
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as client:
 
         async def one(i: int) -> httpx.Response:
+            async with asyncio.timeout(10):
+                await start.wait()
             return await client.post(
                 URL,
                 json=booking_body(vin=f"RACEVIN{i:02d}"),
@@ -795,7 +805,7 @@ async def test_v002_race_eight_clients_four_pairs(engine, capsys) -> None:
     assert statuses == {201: 4, 409: 4}, [r.json() for r in responses]
     winners = [r.json() for r in responses if r.status_code == 201]
     assert (
-        len({w["bay_id"] for w in winners}) == 2 and len({w["technician_id"] for w in winners}) == 2
+        len({w["bay_id"] for w in winners}) == 4 and len({w["technician_id"] for w in winners}) == 4
     )
     assert all(r.json()["code"] == "capacity_exhausted" for r in responses if r.status_code == 409)
     assert await overlap_count(engine) == 0
@@ -838,3 +848,4 @@ Done when: `make lint && make test` green; the local CI equivalent recorded in t
 | 2026-11-04 | JP (D-045) | T13 done-when: local CI equivalent recorded; GitHub CI after the authorised push | No-push rule during the overnight run |
 | 2026-11-04 | orchestrator (Execution) | TC-38 heading check uses `grep -Ec '^## (API|Running the demo|Testing)$' README.md` (prints 3 on GNU and BSD grep); T13 paths gain `Makefile` (test target exports the testcontainers socket override) and the CI mypy step is `uv run mypy src tests/fakes.py` (AC-15 requires the fakes to type-check); T12 compose change includes `PYTHONUNBUFFERED=1` on `api` so event lines reach `docker compose logs` | T12/T13 verification findings |
 | 2026-11-05 | JP (D-048) | UnitOfWork.serialise(dealership_id) after the claim; 40P01 keeps the pair; TC-01 deadlock clause and the Booking sequence updated | Race finding: deadlock detection latency and a false capacity_exhausted |
+| 2026-11-04 | JP (D-049) | TC-31, AC-07, T11 block: the race synchronises the 8 clients before they send (`asyncio.Barrier` in the test, no attempt gate); AC-07 and the T11 example aligned with the D-044 fixture (4 bays x 4 technicians); TC-11 unchanged | D-048 audit cycle 2: an attempt gate inside the transaction deadlocks against the dealership lock taken before it |
