@@ -37,3 +37,9 @@ Audit: docs/ai/reviews/SPEC-001-T10a-audit.md — pass (cycle 3; cycles 1–2 we
 Rules fixed: the "now" cutoff rounds up to the next whole minute and a start equal to now is allowed. Local `Hours`/`Dealership` stand-ins pending replacement by T4 imports (consolidation commit).
 
 Wave A merged 2026-11-04 22:05: `uv run pytest -q` → 32 passed; pre-commit and `mypy src` green.
+
+## T3
+Commits: leg/t3 (seed migration 0002 + TC-34 seed clauses), 5941b6c (audit); merged as the commit above this line's merge.
+Tests: `uv run pytest tests/test_seed.py tests/test_architecture.py -q` → 9 passed.
+Audit: docs/ai/reviews/SPEC-001-T3-audit.md — pass (cycle 1).
+Rules fixed: dealership 1 open Mon–Sat, dealership 2 Mon–Fri, Sunday absent; seed ids < 100 and the five seeded tables' id counters set to 99 (appointment counter untouched, it has no seed rows).
