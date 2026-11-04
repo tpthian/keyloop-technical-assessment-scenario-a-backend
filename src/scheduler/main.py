@@ -19,12 +19,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from scheduler.application.book_appointment import BookAppointment
 from scheduler.application.get_appointment import GetAppointment
+from scheduler.application.get_availability import GetAvailability
 from scheduler.application.ports import AttemptGate, Clock
 from scheduler.infrastructure.clock import SystemClock
 from scheduler.infrastructure.postgres.engine import make_engine
 from scheduler.infrastructure.postgres.repositories import PostgresSchedulingReadRepository
 from scheduler.infrastructure.postgres.unit_of_work import PostgresUnitOfWork
-from scheduler.interfaces.http import appointments, health
+from scheduler.interfaces.http import appointments, availability, health
 from scheduler.interfaces.http.dependencies import UseCases
 from scheduler.interfaces.http.errors import register_handlers
 from scheduler.interfaces.http.events import WideEventMiddleware
@@ -39,14 +40,16 @@ def create_app(
     owns_engine = engine is None
     db = make_engine(get_settings().DATABASE_URL) if engine is None else engine
     reads = PostgresSchedulingReadRepository(db.connect)
+    the_clock: Clock = SystemClock() if clock is None else clock  # one clock for every use case
     uc = UseCases(
         reads=reads,
         book_appointment=BookAppointment(
             uow=lambda: PostgresUnitOfWork(db),
-            clock=SystemClock() if clock is None else clock,
+            clock=the_clock,
             gate=attempt_gate,  # test seam for the barrier race; None in production
         ),
         get_appointment=GetAppointment(reads),
+        get_availability=GetAvailability(reads, the_clock),
     )
 
     @asynccontextmanager
@@ -60,6 +63,7 @@ def create_app(
     app = FastAPI(title="Unified Service Scheduler", lifespan=lifespan)
     app.state.engine = db  # readiness only; nothing else lives on app.state
     app.include_router(appointments.build_router(uc))
+    app.include_router(availability.build_router(uc))
     app.include_router(health.build_router(db))
     app.add_middleware(WideEventMiddleware)
     register_handlers(app)
