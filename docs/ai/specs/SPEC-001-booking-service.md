@@ -742,7 +742,7 @@ Done when: TC-03–07 pass; `domain` imports nothing outside the standard librar
 
 **T5: Attempt policy** (design §3, ADR-004)
 Paths: `src/scheduler/domain/attempts.py`, `tests/test_attempts.py`.
-Tests use a scripted `reserve` coroutine returning a fixed sequence and recording the candidates it saw. Done when: TC-01, TC-02 pass. Commit: `SPEC-001 T5: attempt policy, next pair never same pair (design §3, ADR-004)`.
+Tests use a scripted `reserve` coroutine returning a fixed sequence and recording the candidates it saw. Done when: TC-01, TC-02 pass. Commit: `SPEC-001 T5: attempt policy, next pair never same pair (design §3, ADR-004)`. Amended by D-048: "never same pair" applies to a named 23P01 loss; a 40P01 names no resource, keeps the pair in the candidate list (attempt and deadlock counted, nothing pruned), and the bound still ends the run.
 
 **T6: Ports, outcomes, booking use case, fakes** (design §2, §3, ADR-008)
 Paths: `src/scheduler/application/{ports,outcomes,presenters,book_appointment,get_appointment}.py`, `tests/fakes.py`, `tests/test_book_appointment_usecase.py`.
