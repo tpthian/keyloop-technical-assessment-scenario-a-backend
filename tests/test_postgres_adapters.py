@@ -146,3 +146,18 @@ async def test_book_appointment_end_to_end_against_real_adapters(engine: AsyncEn
     stored = await reads.appointment(DEALERSHIP, int(outcome.body["appointment_id"]))  # type: ignore[call-overload]
     assert stored is not None and stored.vehicle.vin == "WVWZZZ1"
     assert outcome.bay_id in BAYS and outcome.technician_id in TECHS
+
+
+async def test_serialise_holds_the_dealership_lock_until_commit(engine: AsyncEngine) -> None:
+    """T7 (D-048): ``serialise(100)`` takes the transaction-scoped advisory lock 100; another
+    connection cannot take it while the transaction is open and can once it commits."""
+    try_lock = text("SELECT pg_try_advisory_xact_lock(CAST(:key AS bigint))")
+    async with engine.connect() as other:
+        async with PostgresUnitOfWork(engine) as tx:
+            await tx.serialise(DEALERSHIP)
+            async with other.begin():
+                held = (await other.execute(try_lock, {"key": DEALERSHIP})).scalar_one()
+            assert held is False
+        async with other.begin():
+            free = (await other.execute(try_lock, {"key": DEALERSHIP})).scalar_one()
+        assert free is True

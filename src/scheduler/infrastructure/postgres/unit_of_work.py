@@ -59,6 +59,17 @@ class PostgresUnitOfWork:
         self.reads = PostgresSchedulingReadRepository(same_connection)
         return self
 
+    async def serialise(self, dealership_id: int) -> None:
+        """``pg_advisory_xact_lock`` keyed by the dealership id; released at COMMIT or ROLLBACK.
+
+        One lock per dealership, taken before the first attempt, so bookings of one dealership
+        form no lock cycles; other dealerships are not blocked (ADR-004 amendment, D-048).
+        """
+        assert self._conn is not None
+        await self._conn.execute(
+            text("SELECT pg_advisory_xact_lock(CAST(:key AS bigint))"), {"key": dealership_id}
+        )
+
     async def __aexit__(
         self,
         et: type[BaseException] | None,
