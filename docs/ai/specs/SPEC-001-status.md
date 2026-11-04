@@ -96,3 +96,14 @@ TC-01, TC-02 (40P01 keeps the pair, bound), TC-11 (`serialise` after the claim, 
 Audit: docs/ai/reviews/SPEC-001-D048-audit.md — pass (cycle 4). Cycle 1: SPEC T5 wording. Cycle 2: TC-31's in-transaction barrier deadlocks against the lock → D-049. Cycle 3: TC-31 `attempts >= 8` unimplementable under serialisation → D-050.
 Deviation (accepted): commit 7ed95e0's subject cites "D-048 audit cycle 1" and no design section or ADR; history kept as is because the committed cycle-2 audit cites that sha.
 Open: T11 (TC-20, TC-31, TC-39) on this head; README placeholder `OUTPUT-PENDING-T11` and the test-table row for `tests/test_concurrency.py` filled at the T11 merge.
+
+## T11
+Commits on leg/t11-v2 (BASE a748549): 8371f71 (tests/test_concurrency.py: TC-20, TC-31, TC-39), 4723799 (audit); merged 5486672.
+Done-when loop: 3 of 3 runs green; 10 further runs all green (split 4/4, deadlocks 0, max latency_ms 108–118).
+V-002: 8 clients, 4 pairs, statuses={201: 4, 409: 4}, attempts=4, deadlocks=0, candidates_pruned=0, max latency_ms=126, wall=129 ms, overlaps=0
+V-002: 8 clients, 4 pairs, statuses={201: 4, 409: 4}, attempts=4, deadlocks=0, candidates_pruned=0, max latency_ms=114, wall=119 ms, overlaps=0
+Before D-048 (first attempt, runbook evidence): split held 9 of 20 runs, up to 13 deadlocks, peaks 1.2–1.4 s. After: every run, 0 deadlocks, 110–126 ms.
+TC-39 (D-050): case (a) dealership 100, 2 bays x 1 technician, bypass row on bay 100 → 201 on bay 101; case (b) dealership 110, 1 x 1 → 409 capacity_exhausted, attempts 1, pruned 1. Bypass rows use skill-less technicians so only the bay is blocked.
+Gates on the merged branch: `uv run pytest -q` → 109 passed; `uv run mypy src tests/fakes.py` green (also green with tests/test_concurrency.py); `uv run pre-commit run --all-files` green.
+Audit: docs/ai/reviews/SPEC-001-T11-audit.md — pass (cycle 1).
+Open: `barrier_gate` in tests/conftest.py is unused since D-049 (T2's file); remove or document at the final gate. README `OUTPUT-PENDING-T11`, test-table row and Known limitations filled in the next T13 commit.
