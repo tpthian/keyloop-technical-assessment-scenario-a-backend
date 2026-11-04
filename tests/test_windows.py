@@ -9,7 +9,8 @@ from __future__ import annotations
 import datetime as dt
 from zoneinfo import ZoneInfo
 
-from scheduler.domain.windows import Dealership, Hours, Window, free, merge, start_windows
+from scheduler.domain.model import Dealership, Hours
+from scheduler.domain.windows import Window, free, merge, start_windows
 
 UTC = dt.UTC
 LONG_AGO = dt.datetime(2000, 1, 1, tzinfo=UTC)

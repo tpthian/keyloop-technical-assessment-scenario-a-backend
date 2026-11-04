@@ -21,6 +21,8 @@ import random
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 
+from scheduler.domain.model import Candidate, Confirmed, ResourceTaken
+
 RETRY_BOUND = 5
 
 NO_BAY_OVERLAP = "no_bay_overlap"
@@ -31,28 +33,6 @@ CONFIRMED = "confirmed"
 CAPACITY_EXHAUSTED = "capacity_exhausted"
 VEHICLE_ALREADY_BOOKED = "vehicle_already_booked"
 CONTENTION = "contention"
-
-
-# moved to model.py at merge (T4 owns model.py): Candidate, Confirmed, ResourceTaken
-@dataclass(frozen=True)
-class Candidate:
-    bay_id: int
-    technician_id: int
-
-
-# moved to model.py at merge (T4 owns model.py)
-@dataclass(frozen=True)
-class Confirmed:
-    appointment_id: int
-
-
-# moved to model.py at merge (T4 owns model.py)
-@dataclass(frozen=True)
-class ResourceTaken:
-    """A lost attempt: ``constraint`` from 23P01; ``None`` with ``deadlock=True`` for 40P01."""
-
-    constraint: str | None
-    deadlock: bool
 
 
 @dataclass(frozen=True)

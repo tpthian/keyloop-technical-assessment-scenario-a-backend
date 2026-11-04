@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from scheduler.domain.attempts import AttemptResult
 
 
 class DomainError(Exception):
@@ -34,13 +34,8 @@ class ReplayConflict(DomainError):  # noqa: N818 (name fixed by the SPEC interfa
 
 
 class Contention(DomainError):  # noqa: N818 (name fixed by the SPEC interface)
-    """Bound of attempts hit with candidates left; the booking transaction rolls back (ADR-008).
+    """Bound of attempts hit with candidates left; the booking transaction rolls back (ADR-008)."""
 
-    ``result`` is a ``domain.attempts.AttemptResult``. It is typed ``Any`` because
-    ``attempts.py`` is SPEC-001 T5 and does not exist on this task's base; tighten the
-    annotation to ``AttemptResult`` once both tasks are merged.
-    """
-
-    def __init__(self, result: Any) -> None:
+    def __init__(self, result: AttemptResult) -> None:
         super().__init__("bound of attempts reached with candidates left")
         self.result = result
