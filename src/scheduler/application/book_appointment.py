@@ -61,7 +61,8 @@ class BookAppointment:
     ) -> None:
         self.uow = uow
         self.clock = clock
-        self.gate = gate  # test seam for the barrier race (TC-31); None in production
+        # test seam for a writer that bypasses the dealership lock (TC-39); None in production
+        self.gate = gate
 
     async def execute(self, cmd: BookingCommand, dealership: Dealership) -> Outcome:
         # dealership already loaded by the interface layer, before BEGIN (design §2, ADR-008 step 2)
@@ -101,7 +102,7 @@ class BookAppointment:
                     cmd.vehicle_key,
                 )
                 if self.gate is not None:
-                    await self.gate()  # test seam: first INSERTs leave together
+                    await self.gate()  # test seam: a writer bypassing the lock (TC-39, D-050)
                 result = await run_attempts(candidates, lambda c: tx.appointments.reserve(new, c))
                 if result.code == CONFIRMED:
                     assert result.appointment_id is not None  # set whenever confirmed

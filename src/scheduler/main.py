@@ -46,7 +46,8 @@ def create_app(
         book_appointment=BookAppointment(
             uow=lambda: PostgresUnitOfWork(db),
             clock=the_clock,
-            gate=attempt_gate,  # test seam for the barrier race; None in production
+            # test seam for a writer that bypasses the dealership lock (TC-39); None in production
+            gate=attempt_gate,
         ),
         get_appointment=GetAppointment(reads),
         get_availability=GetAvailability(reads, the_clock),
