@@ -233,7 +233,7 @@ async def test_contention_rolls_back_and_records_nothing() -> None:
     world = World(candidates=candidates, script=[DEADLOCK] * 5)
     outcome = await world.book()
     assert (outcome.code, outcome.final) == ("contention", False)
-    assert (outcome.attempts, outcome.deadlocks, outcome.candidates_pruned) == (5, 5, 5)
+    assert (outcome.attempts, outcome.deadlocks, outcome.candidates_pruned) == (5, 5, 0)
     assert world.uow.rolled_back is True and world.uow.committed is False
     assert world.key_row is None  # the claim is discarded with the transaction
     assert world.appointments.rows == {}

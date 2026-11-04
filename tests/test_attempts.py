@@ -57,14 +57,16 @@ async def test_tc01_technician_overlap_prunes_every_candidate_with_that_technici
     assert result == AttemptResult("confirmed", 2, 0, 2, Candidate(1, 20), 8)
 
 
-async def test_tc01_deadlock_prunes_only_the_pair() -> None:
+async def test_tc01_deadlock_keeps_the_pair() -> None:
+    """TC-01, 40P01 clause as amended by D-048 (supersedes "40P01 prunes only the pair"): a
+    deadlock names no resource and the pair may still be free, so nothing is pruned; the
+    attempt and the deadlock are counted and the same pair is tried again."""
     reserve = ScriptedReserve([DEADLOCK, Confirmed(9)])
 
     result = await run_attempts(grid([1, 2], [10, 20]), reserve)
 
-    # (1,20) shares bay 1 and is still tried next: a deadlock names no resource
-    assert reserve.seen == [Candidate(1, 10), Candidate(1, 20)]
-    assert result == AttemptResult("confirmed", 2, 1, 1, Candidate(1, 20), 9)
+    assert reserve.seen == [Candidate(1, 10), Candidate(1, 10)]
+    assert result == AttemptResult("confirmed", 2, 1, 0, Candidate(1, 10), 9)
 
 
 async def test_tc01_vehicle_overlap_stops_with_vehicle_already_booked() -> None:
@@ -81,12 +83,12 @@ async def test_tc01_vehicle_overlap_stops_with_vehicle_already_booked() -> None:
 
 async def test_tc02_bound_of_five_with_candidates_left_is_contention() -> None:
     assert RETRY_BOUND == 5
-    reserve = ScriptedReserve([DEADLOCK] * 5)  # 9 pairs, 5 pruned, 4 left; a sixth call fails
+    reserve = ScriptedReserve([DEADLOCK] * 5)  # 9 pairs, none pruned (D-048); a sixth call fails
 
     result = await run_attempts(grid([1, 2, 3], [10, 20, 30]), reserve)
 
     assert len(reserve.seen) == 5
-    assert result == AttemptResult("contention", 5, 5, 5, None, None)
+    assert result == AttemptResult("contention", 5, 5, 0, None, None)
 
 
 async def test_tc02_pruned_list_empty_is_capacity_exhausted() -> None:
