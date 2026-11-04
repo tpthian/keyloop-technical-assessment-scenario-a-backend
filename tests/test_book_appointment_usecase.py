@@ -86,7 +86,9 @@ class World:
             script=script or [],
             log=self.log,
         )
-        self.idempotency = FakeIdempotency({(LONDON.id, KEY): stored} if stored else None)
+        self.idempotency = FakeIdempotency(
+            {(LONDON.id, KEY): stored} if stored else None, log=self.log
+        )
         self.uow = FakeUnitOfWork(self.reads, self.appointments, self.idempotency)
         self.gate = CountingGate(self.log)
         self.use_case = BookAppointment(factory(self.uow), FixedClock(NOW), self.gate)
@@ -242,4 +244,18 @@ async def test_attempt_gate_awaited_once_before_first_reserve() -> None:
     outcome = await world.book()
     assert outcome.code == "confirmed"
     assert world.gate.calls == 1
-    assert world.log == ["gate", "reserve", "reserve", "reserve"]
+    assert world.log == ["claim", "serialise", "gate", "reserve", "reserve", "reserve"]
+
+
+async def test_serialise_after_claim_before_any_reserve_and_never_on_replay() -> None:
+    """TC-11 (D-048): a booking takes the dealership lock after the claim and before the gate and
+    the first reserve; a replay returns after the claim without taking it."""
+    booking = World(script=[Confirmed(7)])
+    await booking.book()
+    assert booking.log == ["claim", "serialise", "gate", "reserve"]
+
+    body = {"code": "capacity_exhausted", "message": "stored"}
+    stored = StoredResponse(canonical_hash(FRIDAY_9, LONDON.zone), "capacity_exhausted", body)
+    replay = World(stored=stored)
+    await replay.book()
+    assert replay.log == ["claim"]
