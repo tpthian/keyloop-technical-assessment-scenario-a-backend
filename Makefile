@@ -1,4 +1,4 @@
-.PHONY: install up down run test lint migrate spike
+.PHONY: install up down run test lint migrate demo spike
 
 install:
 	uv sync
@@ -13,11 +13,19 @@ down:
 run:
 	uv run uvicorn scheduler.main:create_app --factory --reload --port 8000
 
+# testcontainers mounts this socket into its reaper container; colima and Docker Desktop
+# expose a different host socket, so the in-VM path is given explicitly. Override if needed.
+TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE ?= /var/run/docker.sock
+
 test:
-	uv run pytest -q
+	TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=$(TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE) uv run pytest -q
 
 lint:
 	uv run pre-commit run --all-files
+
+demo:
+	docker compose up -d --build --wait db api
+	scripts/demo.sh
 
 migrate:
 	uv run alembic upgrade head
