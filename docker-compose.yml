@@ -17,8 +17,14 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql+psycopg://scheduler:scheduler@db:5432/scheduler
+      # Event lines go to stdout; unbuffered so they reach `docker compose logs` at once.
+      PYTHONUNBUFFERED: "1"
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && uvicorn scheduler.main:create_app --factory --host 0.0.0.0 --port 8000
