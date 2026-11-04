@@ -68,3 +68,10 @@ Tests: `uv run pytest tests/test_booking_api.py tests/test_idempotency.py -q` �
 Audit: docs/ai/reviews/SPEC-001-T8-audit.md — pass (cycle 1).
 Defect caught by TC-21: an uncorrelated NOT EXISTS in the T7 qualification query made every technician qualified whenever any technician held the skill; fixed in 1e2cca6 (orchestrator-approved fix inside the Contract).
 Rules fixed: `route` and `idempotency_key` are written to the event before ADR-008 steps 2–3 so 400/404/422 events carry the key (ADR-013); `service_type_id` is written after schema validation; error handlers set `code` on every error response.
+
+## T10b
+Commits: leg/t10b (GetAvailability use case and route; a second commit typed the handler return after audit cycle 1), 4931990 (audit); merged after this section's status commit.
+Tests: `uv run pytest tests/test_availability.py -q` → 10 passed (TC-28, TC-29 exact London windows, TC-30). Full suite 104 passed.
+Audit: docs/ai/reviews/SPEC-001-T10b-audit.md — pass (cycle 2).
+Rules fixed where the SPEC was silent: days are `[from, to)` and the horizon is checked on the exclusive `to`; the busy-range read spans first opening to last closing plus duration; no bay, no qualified technician or no open day → 200 with empty windows. TC-30 read as `[opens, closes - 1 min]` on every open day regardless of duration (consistent with AC-06).
+Deviation: `AvailabilityOut`/`WindowOut` live in `availability.py` (T8a owns `schemas.py`); relocation to `schemas.py` is a follow-up commit before the final audit.
