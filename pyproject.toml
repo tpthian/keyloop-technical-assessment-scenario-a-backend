@@ -8,11 +8,10 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "psycopg[binary,pool]",
-    "sqlalchemy>=2",
+    "sqlalchemy[asyncio]>=2",
+    "greenlet",
     "alembic",
     "pydantic-settings",
-    "structlog",
-    "prometheus-client",
 ]
 
 [dependency-groups]
