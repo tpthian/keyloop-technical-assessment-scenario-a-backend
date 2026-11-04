@@ -5,41 +5,19 @@ are query aliases (``from`` is a Python keyword); a missing or mistyped query pa
 ``RequestValidationError`` and answers 422 ``validation`` through ``errors.py``. An unknown
 dealership is 404 ``not_found``; the business rules of the use case are 422 ``validation``.
 
-``AvailabilityOut`` and ``WindowOut`` document the 200 body in ``/docs``; the handler returns
-the use case's dict, so nothing is re-serialised through them.
+``AvailabilityOut`` (in ``schemas.py``) documents the 200 body in ``/docs``; the handler returns
+the use case's dict, so nothing is re-serialised through it.
 """
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel, ConfigDict, Field
 
 from scheduler.interfaces.http.dependencies import UseCases
-from scheduler.interfaces.http.schemas import ErrorOut
-
-
-class WindowOut(BaseModel):
-    """One pair's inclusive start window on one local day; instants in UTC with ``Z``."""
-
-    bay_id: int
-    technician_id: int
-    date: date
-    earliest_start: datetime
-    latest_start: datetime
-
-
-class AvailabilityOut(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    dealership_id: int
-    service_type_id: int
-    from_: date = Field(alias="from")
-    to: date
-    as_of: datetime  # data watermark (ADR-010), not the response time
-    windows: list[WindowOut]
+from scheduler.interfaces.http.schemas import AvailabilityOut, ErrorOut
 
 
 def build_router(uc: UseCases) -> APIRouter:
