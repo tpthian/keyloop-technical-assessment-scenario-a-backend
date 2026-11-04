@@ -43,3 +43,9 @@ Commits: leg/t3 (seed migration 0002 + TC-34 seed clauses), 5941b6c (audit); mer
 Tests: `uv run pytest tests/test_seed.py tests/test_architecture.py -q` → 9 passed.
 Audit: docs/ai/reviews/SPEC-001-T3-audit.md — pass (cycle 1).
 Rules fixed: dealership 1 open Mon–Sat, dealership 2 Mon–Fri, Sunday absent; seed ids < 100 and the five seeded tables' id counters set to 99 (appointment counter untouched, it has no seed rows).
+
+## T6
+Commits: leg/t6 (T6a ports and outcomes; T6b BookAppointment use case with fakes), b6b4bf7 (audit); merged as the merge commit following this section's status commit.
+Tests: `uv run pytest tests/test_book_appointment_usecase.py tests/test_architecture.py -q` → 17 passed (TC-09, TC-10, TC-11), no database. `uv run mypy src tests/fakes.py` green.
+Audit: docs/ai/reviews/SPEC-001-T6-audit.md — pass (cycle 1).
+Rules fixed: a replayed 201 carries the stored bay and technician in the Outcome (ADR-013: null only when not a 201); a claimed key row with no recorded outcome raises and becomes a 5xx (cannot occur for a committed row). Note for T7: the unit of work declares `appointments`, `idempotency`, `reads` with the port types, not the adapter classes.
