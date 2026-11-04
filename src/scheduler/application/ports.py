@@ -85,6 +85,15 @@ class UnitOfWork(Protocol):
     idempotency: IdempotencyRepository
     reads: SchedulingReadRepository  # same connection, for in-transaction reference reads
 
+    async def serialise(self, dealership_id: int) -> None:
+        """Transaction-scoped advisory lock, so bookings of one dealership run one at a time.
+
+        Held until COMMIT or ROLLBACK. Every booking of a dealership takes the same single lock
+        before its first attempt, so attempts form no lock cycles and no 40P01 arises under
+        contention (ADR-004 amendment, D-048).
+        """
+        ...
+
     async def __aenter__(self) -> UnitOfWork: ...
     async def __aexit__(
         self,

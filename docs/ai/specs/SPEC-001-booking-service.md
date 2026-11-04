@@ -202,7 +202,7 @@ Wide event, one JSON line on stdout per request, keys in this order: `v, ts, req
 - AC-04 Idempotency boundary: every row of the ADR-008 table holds: 400 for malformed JSON or a non-UUID key, 404 unknown dealership, schema 422 never stored; business 422, 201 and final 409 stored and replayed; same key different body → 422 `replay_conflict`; concurrent same key → one appointment, identical answers.
 - AC-05 Time: start outside hours, in the past, beyond 90 days, or in a DST gap → 422 stored; a repeated local time takes the first occurrence; a 4,320-minute service from Fri 2027-03-26 09:00 London ends 2027-03-29T09:00:00Z; `pickup_from` equals `end_at` when inside hours, else the next opening instant, skipping closed days.
 - AC-06 Availability: the ADR-010 worked example returns exactly Friday `[09:00Z, 11:00Z]` and Monday `[13:00Z, 16:59Z]` for the one pair; windows over 14 days or outside the horizon → 422; response carries `as_of`.
-- AC-07 Concurrency (V-002): 8 concurrent bookings of one slot at a dealership with 2 bays × 2 technicians, released together by a barrier, yield exactly 4 × 201 and 4 × 409 `capacity_exhausted`, distinct bays and technicians among winners, 8 committed key rows, overlap count 0, whatever mix of 23P01 and 40P01 occurred.
+- AC-07 Concurrency (V-002): 8 concurrent bookings of one slot at a dealership with 4 bays × 4 qualified technicians (test-owned fixture, D-044), the clients released together by a barrier before they send (D-049), yield exactly 4 × 201 and 4 × 409 `capacity_exhausted`, distinct bays and technicians among winners, 8 committed key rows, overlap count 0, whatever mix of 23P01 and 40P01 occurred.
 - AC-08 Tenancy: an appointment referencing a bay or technician of another dealership is refused by the database; a dealership with no bays gets `capacity_exhausted`; with no qualified technician, 422.
 - AC-09 Health: `/health/live` 200 always; `/health/ready` 200 with the database and 503 without.
 - AC-10 Event: every response emits exactly one JSON line with the 17 keys in order; a booking line carries `attempts`, `deadlocks`, `candidates_pruned`, `replay`, `final`; no line contains an email, VIN or `vehicle_key`.
@@ -210,6 +210,7 @@ Wide event, one JSON line on stdout per request, keys in this order: `v, ts, req
 - AC-12 Gates: `make lint` and `make test` pass on the branch; CI passes.
 - AC-13 README: "API", "Running the demo", "Testing" filled; status line updated; other sections untouched.
 - AC-14 Layers: `tests/test_architecture.py` passes: `domain` imports only the standard library and itself; `application` imports only `domain` and itself; `infrastructure` and `interfaces` never import each other; only `main` imports both.
+- AC-16 Retry fallback (D-050): a writer that bypasses the dealership lock and takes a resource between the candidate read and the first INSERT costs the booking one attempt per lost resource; the booking lands on a remaining free pair (201) or ends with 409 `capacity_exhausted` when none remains; never a 5xx, never an overlap.
 - AC-15 Use cases run without a database: `BookAppointment` is exercised end to end against in-memory fakes (claim, replay, validation, attempts, contention rollback), and the fakes implement the same Protocols as the PostgreSQL adapters (mypy checks structural conformance).
 
 ### Test Cases
@@ -218,7 +219,7 @@ Edge and regression first, happy path last. Layer in the fourth column.
 
 | TC | Case | AC | File (layer) |
 |---|---|---|---|
-| TC-01 | Attempt policy: `no_bay_overlap` prunes every candidate with that bay; `no_technician_overlap` prunes the technician; 40P01 prunes only the pair; `no_vehicle_overlap` stops with `vehicle_already_booked` | AC-03 | test_attempts.py (domain) |
+| TC-01 | Attempt policy: `no_bay_overlap` prunes every candidate with that bay; `no_technician_overlap` prunes the technician; 40P01 keeps the pair (counted, nothing pruned; D-048); `no_vehicle_overlap` stops with `vehicle_already_booked` | AC-03 | test_attempts.py (domain) |
 | TC-02 | Attempt policy: bound of 5 with candidates left → `contention`; pruned list empty → `capacity_exhausted`; empty input → `capacity_exhausted` with 0 attempts | AC-03 | test_attempts.py (domain) |
 | TC-03 | `local_to_utc`: London 2027-03-28 01:30 raises `GapTime`; 2027-10-31 01:30 → 00:30Z (first occurrence); ordinary time converts | AC-05 | test_time_rules.py (domain) |
 | TC-04 | `start_in_hours`: at `opens_at` true, at `closes_at` false, missing weekday false | AC-05 | test_time_rules.py |
@@ -228,7 +229,7 @@ Edge and regression first, happy path last. Layer in the fourth column.
 | TC-08 | Windows arithmetic: merge of overlapping busy ranges; free gaps; duration subtracted on UTC before intersecting local day; closing bound `closes - 1 min` | AC-06 | test_windows.py (domain) |
 | TC-09 | Use case with fakes: `reads.dealership` is never called (the dealership arrives as an argument); claim exists with other hash → `ReplayConflict`; claim exists with same hash → replay Outcome, `replay=True`, no attempt | AC-04 | test_book_appointment_usecase.py (application) |
 | TC-10 | Use case with fakes: business failures (unknown service type, gap, past, horizon, outside hours, no qualified technician) → `validation` Outcome recorded on the key; no attempt | AC-05, AC-08 | test_book_appointment_usecase.py |
-| TC-11 | Use case with fakes: scripted `reserve` results drive 201 recorded, `capacity_exhausted` recorded, `vehicle_already_booked` recorded, `contention` with the unit of work rolled back and nothing recorded; `AttemptGate` awaited exactly once before the first reserve | AC-03, AC-04 | test_book_appointment_usecase.py |
+| TC-11 | Use case with fakes: scripted `reserve` results drive 201 recorded, `capacity_exhausted` recorded, `vehicle_already_booked` recorded, `contention` with the unit of work rolled back and nothing recorded; `AttemptGate` awaited exactly once before the first reserve; `serialise` called after the claim and before the gate and any reserve, never on a replay (D-048) | AC-03, AC-04 | test_book_appointment_usecase.py |
 | TC-12 | Adapter: `reserve` returns `Confirmed` on a free pair; `ResourceTaken("no_bay_overlap", False)` on a bay clash and the transaction continues (a later INSERT in the same transaction succeeds); `ResourceTaken("no_vehicle_overlap", False)` on a vehicle clash; a non-constraint error re-raises | AC-03 | test_postgres_adapters.py (infrastructure) |
 | TC-13 | Adapter: `claim` returns `None` on first insert and the stored row on the second; `record` fills code and body; `free_candidates` excludes busy bays and technicians and only lists qualified ones | AC-04, AC-02 | test_postgres_adapters.py |
 | TC-14 | Layer rule: the AST import scan of `src/scheduler` finds no forbidden edge (AC-14 list) | AC-14 | test_architecture.py |
@@ -248,7 +249,8 @@ Edge and regression first, happy path last. Layer in the fourth column.
 | TC-28 | Availability: 15-day window → 422; `to <= from` → 422; `to` beyond horizon → 422; unknown service type → 422; unknown dealership → 404 | AC-06 | test_availability.py |
 | TC-29 | Availability worked example (London, 72 h, E1, E2, clock 2027-03-25T16:00Z): exactly the two windows of AC-06; `as_of` aware UTC | AC-06 | test_availability.py |
 | TC-30 | Availability with no appointments: every open day `[opens, closes - 1 min]` shifted by the duration at the right end; Sunday absent | AC-06 | test_availability.py |
-| TC-31 | V-002 race: 8 clients against a test-owned fixture of 4 bays and 4 qualified technicians (the seed's 2x2 allows only 2 concurrent winners; D-044), barrier; statuses {201: 4, 409: 4}; winners distinct; overlap 0; 8 key rows all recorded; events' `attempts` sum ≥ 8; elapsed printed | AC-07, AC-10 | test_concurrency.py |
+| TC-31 | V-002 race: 8 clients against a test-owned fixture of 4 bays and 4 qualified technicians (the seed's 2x2 allows only 2 concurrent winners; D-044); the clients wait on an `asyncio.Barrier(8)` and send together, no attempt gate (the bookings queue on the dealership lock; D-049); statuses {201: 4, 409: 4}; winners distinct; overlap 0; 8 key rows all recorded; events' `attempts` sum == 4 (one per winner, zero per loser: the bookings run one at a time and a loser reads an empty candidate list; D-048); elapsed printed | AC-07, AC-10 | test_concurrency.py |
+| TC-39 | Retry fallback (D-050), two bookings through `create_app` with an `attempt_gate` that, when awaited, inserts on a separate autocommit connection (no `serialise`) an appointment occupying bay 100 for the slot, then returns. (a) Dealership 2 bays x 1 qualified technician: 201 on bay 101; event `attempts == 1 + candidates_pruned`, `candidates_pruned <= 1`, `deadlocks == 0`. (b) Dealership 1 bay x 1 technician: 409 `capacity_exhausted`, event `attempts == 1`, `candidates_pruned == 1`. Overlap 0 after both; 3 appointment rows | AC-16 | test_concurrency.py |
 | TC-32 | Event schema: one line per response, 17 keys in order, `v == 1`; `final` true for 201, final 409 and 422, false for `contention`; health lines carry null booking fields; no `@` and no VIN substring in any line | AC-10 | test_events.py |
 | TC-33 | `/health/live` 200; `/health/ready` 200; with an engine on a closed port, 503 | AC-09 | test_health.py |
 | TC-34 | Seed: 2 dealerships, 3 service types (one 4,320 min), dealership 1 has 2 bays and 2 technicians, both hold `general`, only technician 1 holds `bodywork`; `btree_gist` installed; the nine named constraints exist | AC-01 | test_seed.py |
@@ -294,6 +296,7 @@ Commit protocol (D-040): one task is one or more commits; each commit reviewable
 | AC-13 | TC-38 | T13 | the three commands of TC-38, output recorded in the status file |
 | AC-14 | TC-14 | T1 | `uv run pytest tests/test_architecture.py -q` |
 | AC-15 | TC-09, 10, 11 | T6 | `uv run pytest tests/test_book_appointment_usecase.py -q` |
+| AC-16 | TC-39 | T11 | `uv run pytest tests/test_concurrency.py -q -s` |
 
 ### Interfaces
 
@@ -355,6 +358,10 @@ class UnitOfWork(Protocol):
     idempotency: IdempotencyRepository
     reads: SchedulingReadRepository  # same connection, for in-transaction reference reads
 
+    # transaction-scoped advisory lock (pg_advisory_xact_lock): bookings of one dealership run
+    # one at a time; no lock cycles, so no 40P01 under contention (ADR-004 amendment, D-048)
+    async def serialise(self, dealership_id: int) -> None: ...
+
     async def __aenter__(self) -> "UnitOfWork": ...
     async def __aexit__(self, et, ev, tb) -> None: ...
 
@@ -396,7 +403,7 @@ Domain functions (signatures; rules in the ADR named):
 | | `canonical_hash(command, zone) -> str` | sha256 of `json.dumps(sort_keys, separators=(",", ":"))` over `{service_type_id, start_at: canonical_utc(...).isoformat(), customer, vehicle}` with `None` values omitted (ADR-008) |
 | `attempts.py` | `RETRY_BOUND = 5` | |
 | | `shuffled(candidates) -> list[Candidate]` | random order, so simultaneous requests spread over pairs (ADR-004) |
-| | `run_attempts(candidates, reserve: Callable[[Candidate], Awaitable[Confirmed | ResourceTaken]], bound=RETRY_BOUND) -> AttemptResult` | next pair never same pair: `no_bay_overlap` prunes the bay, `no_technician_overlap` prunes the technician, 40P01 or an unknown constraint prunes the pair, `no_vehicle_overlap` stops with `vehicle_already_booked`; empty list → `capacity_exhausted`; bound hit with pairs left → `contention` |
+| | `run_attempts(candidates, reserve: Callable[[Candidate], Awaitable[Confirmed | ResourceTaken]], bound=RETRY_BOUND) -> AttemptResult` | a lost resource is never tried again: `no_bay_overlap` prunes the bay, `no_technician_overlap` prunes the technician, an unknown constraint prunes the pair, 40P01 keeps the pair (D-048), `no_vehicle_overlap` stops with `vehicle_already_booked`; empty list → `capacity_exhausted`; bound hit with pairs left → `contention` |
 | `windows.py` | `merge(ranges)`, `free(busy, lo, hi)`, `start_windows(dealership, days, duration, busy_by_bay, busy_by_tech, bays, techs, earliest_now) -> list[Window]` | subtract the duration on UTC instants, then intersect with each local day window; latest start is `min(free_end - duration, closes - 1 min)` (ADR-010) |
 | `errors.py` | `DomainError` base; `GapTime(ValueError)`, `NoOpeningInstant`, `NotFound(what)`, `ValidationFailed(message)`, `ReplayConflict`, `Contention(result: AttemptResult)` | HTTP mapping lives in the interface layer |
 
@@ -419,6 +426,7 @@ async def execute(self, cmd: BookingCommand, dealership: Dealership) -> Outcome:
                 if stored.request_hash != request_hash:
                     raise ReplayConflict()
                 return replay_outcome(stored)  # final=True, replay=True
+            await tx.serialise(cmd.dealership_id)  # this request books: one at a time (D-048)
             failure, service_type, start_utc = await self._validate(tx.reads, dealership, cmd)
             if failure is not None:
                 body = validation_body(failure)
@@ -737,7 +745,7 @@ Done when: TC-03–07 pass; `domain` imports nothing outside the standard librar
 
 **T5: Attempt policy** (design §3, ADR-004)
 Paths: `src/scheduler/domain/attempts.py`, `tests/test_attempts.py`.
-Tests use a scripted `reserve` coroutine returning a fixed sequence and recording the candidates it saw. Done when: TC-01, TC-02 pass. Commit: `SPEC-001 T5: attempt policy, next pair never same pair (design §3, ADR-004)`.
+Tests use a scripted `reserve` coroutine returning a fixed sequence and recording the candidates it saw. Done when: TC-01, TC-02 pass. Commit: `SPEC-001 T5: attempt policy, next pair never same pair (design §3, ADR-004)`. Amended by D-048: "never same pair" applies to a named 23P01 loss; a 40P01 names no resource, keeps the pair in the candidate list (attempt and deadlock counted, nothing pruned), and the bound still ends the run.
 
 **T6: Ports, outcomes, booking use case, fakes** (design §2, §3, ADR-008)
 Paths: `src/scheduler/application/{ports,outcomes,presenters,book_appointment,get_appointment}.py`, `tests/fakes.py`, `tests/test_book_appointment_usecase.py`.
@@ -767,15 +775,25 @@ The test, given in full because its assertions are the evidence:
 
 ```python
 async def test_v002_race_eight_clients_four_pairs(engine, capsys) -> None:
-    """Production retry policy (bound 5, deadlock_timeout 100 ms); either SQLSTATE accepted (L-001)."""
-    await make_dealership(engine, 100, bays=[100, 101], technicians={100: [1], 101: [1]})
+    """Production retry policy (bound 5, deadlock_timeout 100 ms); either SQLSTATE accepted (L-001).
+
+    The clients are released together by a barrier before they send (D-049); inside the service
+    the bookings of the dealership queue on the advisory lock (ADR-004 amendment, D-048), so no
+    attempt gate is injected and no 40P01 is expected.
+    """
+    await make_dealership(
+        engine, 100, bays=[100, 101, 102, 103], technicians={100: [1], 101: [1], 102: [1], 103: [1]}
+    )
     n = 8
-    app = create_app(engine=engine, clock=FixedClock(FIXED_NOW), attempt_gate=barrier_gate(n))
+    app = create_app(engine=engine, clock=FixedClock(FIXED_NOW))
+    start = asyncio.Barrier(n)
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as client:
 
         async def one(i: int) -> httpx.Response:
+            async with asyncio.timeout(10):
+                await start.wait()
             return await client.post(
                 URL,
                 json=booking_body(vin=f"RACEVIN{i:02d}"),
@@ -790,7 +808,7 @@ async def test_v002_race_eight_clients_four_pairs(engine, capsys) -> None:
     assert statuses == {201: 4, 409: 4}, [r.json() for r in responses]
     winners = [r.json() for r in responses if r.status_code == 201]
     assert (
-        len({w["bay_id"] for w in winners}) == 2 and len({w["technician_id"] for w in winners}) == 2
+        len({w["bay_id"] for w in winners}) == 4 and len({w["technician_id"] for w in winners}) == 4
     )
     assert all(r.json()["code"] == "capacity_exhausted" for r in responses if r.status_code == 409)
     assert await overlap_count(engine) == 0
@@ -804,7 +822,8 @@ async def test_v002_race_eight_clients_four_pairs(engine, capsys) -> None:
     evs = [
         json.loads(ln) for ln in capsys.readouterr().out.splitlines() if '"book_appointment"' in ln
     ]
-    assert len(evs) == n and sum(e["attempts"] for e in evs) >= n
+    assert len(evs) == n and sum(e["attempts"] for e in evs) == 4  # serialised: no retries
+    assert all(e["attempts"] == 0 for e in evs if e["code"] == "capacity_exhausted")
     deadlocks = sum(e["deadlocks"] for e in evs)
     print(
         f"\nV-002: {n} clients, 4 pairs, attempts={sum(e['attempts'] for e in evs)}, deadlocks={deadlocks},"
@@ -813,6 +832,8 @@ async def test_v002_race_eight_clients_four_pairs(engine, capsys) -> None:
 ```
 
 Plus TC-20 (two concurrent POSTs with one key: both 201, same body, one row, one key row).
+
+Plus TC-39 (D-050), `test_retry_fallback_when_a_writer_bypasses_the_lock`: the attempt gate is the seam for the bypassing writer; it runs after the candidate read and before the first INSERT, exactly the window the dealership lock closes for requests that honour it. The bypass inserts through `engine.begin()` with `row_of`-shaped values (ids ≥ 100, the same slot as `booking_body()`), so the row commits outside the booking transaction. Case (a) shows the loop landing on the free pair (the shuffle decides whether the blocked bay is tried first, hence `attempts == 1 + candidates_pruned`); case (b) shows the clean 409 when the only pair is lost. Both prove the retry loop is live as the fallback behind the lock (ADR-004 amendment).
 Done when: three consecutive runs pass (`for i in 1 2 3; do uv run pytest tests/test_concurrency.py -q -s || break; done`); the `V-002:` lines go into the status file. Commit: `SPEC-001 T11: V-002 concurrency evidence and parallel same-key test (design §3, ADR-013)`.
 
 **T12: Demo, compose, Makefile** (ADR-012, D-035)
@@ -832,3 +853,6 @@ Done when: `make lint && make test` green; the local CI equivalent recorded in t
 | 2026-11-04 | JP (D-044) | TC-31/T11: race test uses its own fixture of 4 bays x 4 technicians; demo race expects 2 winners against the seed | Codex plan review: seed 2x2 cannot yield 4 concurrent winners |
 | 2026-11-04 | JP (D-045) | T13 done-when: local CI equivalent recorded; GitHub CI after the authorised push | No-push rule during the overnight run |
 | 2026-11-04 | orchestrator (Execution) | TC-38 heading check uses `grep -Ec '^## (API|Running the demo|Testing)$' README.md` (prints 3 on GNU and BSD grep); T13 paths gain `Makefile` (test target exports the testcontainers socket override) and the CI mypy step is `uv run mypy src tests/fakes.py` (AC-15 requires the fakes to type-check); T12 compose change includes `PYTHONUNBUFFERED=1` on `api` so event lines reach `docker compose logs` | T12/T13 verification findings |
+| 2026-11-05 | JP (D-048) | UnitOfWork.serialise(dealership_id) after the claim; 40P01 keeps the pair; TC-01 deadlock clause and the Booking sequence updated | Race finding: deadlock detection latency and a false capacity_exhausted |
+| 2026-11-04 | JP (D-050) | AC-16, TC-39 added to T11: retry-fallback test where a writer bypasses the dealership lock from the attempt gate; the `AttemptGate` seam stays for this purpose. TC-31 `attempts` sum becomes `== 4` with zero attempts per loser (D-048 audit cycle 3 F-001, Execution) | Under D-048 the retry loop fires only for writers around the lock; the fallback needs evidence, and the old `>= 8` was unimplementable |
+| 2026-11-04 | JP (D-049) | TC-31, AC-07, T11 block: the race synchronises the 8 clients before they send (`asyncio.Barrier` in the test, no attempt gate); AC-07 and the T11 example aligned with the D-044 fixture (4 bays x 4 technicians); TC-11 unchanged | D-048 audit cycle 2: an attempt gate inside the transaction deadlocks against the dealership lock taken before it |

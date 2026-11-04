@@ -3,12 +3,15 @@
 ADR-008 steps 1 to 3 (parse, load the dealership, schema validation) happen in the interface
 layer before this runs; the loaded ``Dealership`` arrives as an argument, so this use case never
 looks one up and never raises ``NotFound`` (SPEC-001 Known Facts 9). Steps 4 to 7 are below, in
-one transaction: hash, claim, business validation, candidates, attempts, record, COMMIT.
+one transaction: hash, claim, serialise, business validation, candidates, attempts, record,
+COMMIT.
 
 Rules kept here:
 
 - ``ReplayConflict`` is raised inside the block; the rollback writes nothing, because the
   original key row belongs to another, committed transaction.
+- ``serialise`` runs only after the claim returns None, so a replay or a replay conflict never
+  waits on the dealership's booking lock (ADR-004 amendment, D-048).
 - ``contention`` leaves the block by raising ``Contention``, so the unit of work rolls back and
   the claim is discarded; it is caught outside the block and returned as a transient outcome.
 - Every stored outcome is recorded before the block exits, so key, appointment and response
@@ -72,6 +75,7 @@ class BookAppointment:
                     if stored.request_hash != request_hash:
                         raise ReplayConflict()
                     return replay_outcome(stored)  # final=True, replay=True
+                await tx.serialise(cmd.dealership_id)  # this request books: one at a time
                 failure, service_type, start_utc = await self._validate(tx.reads, dealership, cmd)
                 if failure is not None:
                     body = validation_body(failure)

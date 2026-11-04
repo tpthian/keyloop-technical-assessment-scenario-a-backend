@@ -86,7 +86,9 @@ class World:
             script=script or [],
             log=self.log,
         )
-        self.idempotency = FakeIdempotency({(LONDON.id, KEY): stored} if stored else None)
+        self.idempotency = FakeIdempotency(
+            {(LONDON.id, KEY): stored} if stored else None, log=self.log
+        )
         self.uow = FakeUnitOfWork(self.reads, self.appointments, self.idempotency)
         self.gate = CountingGate(self.log)
         self.use_case = BookAppointment(factory(self.uow), FixedClock(NOW), self.gate)
@@ -231,7 +233,7 @@ async def test_contention_rolls_back_and_records_nothing() -> None:
     world = World(candidates=candidates, script=[DEADLOCK] * 5)
     outcome = await world.book()
     assert (outcome.code, outcome.final) == ("contention", False)
-    assert (outcome.attempts, outcome.deadlocks, outcome.candidates_pruned) == (5, 5, 5)
+    assert (outcome.attempts, outcome.deadlocks, outcome.candidates_pruned) == (5, 5, 0)
     assert world.uow.rolled_back is True and world.uow.committed is False
     assert world.key_row is None  # the claim is discarded with the transaction
     assert world.appointments.rows == {}
@@ -242,4 +244,18 @@ async def test_attempt_gate_awaited_once_before_first_reserve() -> None:
     outcome = await world.book()
     assert outcome.code == "confirmed"
     assert world.gate.calls == 1
-    assert world.log == ["gate", "reserve", "reserve", "reserve"]
+    assert world.log == ["claim", "serialise", "gate", "reserve", "reserve", "reserve"]
+
+
+async def test_serialise_after_claim_before_any_reserve_and_never_on_replay() -> None:
+    """TC-11 (D-048): a booking takes the dealership lock after the claim and before the gate and
+    the first reserve; a replay returns after the claim without taking it."""
+    booking = World(script=[Confirmed(7)])
+    await booking.book()
+    assert booking.log == ["claim", "serialise", "gate", "reserve"]
+
+    body = {"code": "capacity_exhausted", "message": "stored"}
+    stored = StoredResponse(canonical_hash(FRIDAY_9, LONDON.zone), "capacity_exhausted", body)
+    replay = World(stored=stored)
+    await replay.book()
+    assert replay.log == ["claim"]

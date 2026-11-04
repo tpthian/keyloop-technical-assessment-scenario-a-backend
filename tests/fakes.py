@@ -133,14 +133,23 @@ class FakeAppointments:
 
 
 class FakeIdempotency:
-    """Key rows in a dict keyed by ``(dealership_id, key)``; ``claim`` inserts or returns."""
+    """Key rows in a dict keyed by ``(dealership_id, key)``; ``claim`` inserts or returns.
 
-    def __init__(self, rows: Mapping[tuple[int, UUID], StoredResponse] | None = None) -> None:
+    ``claim`` writes ``"claim"`` into ``log``; a test shares the log to see the call order.
+    """
+
+    def __init__(
+        self,
+        rows: Mapping[tuple[int, UUID], StoredResponse] | None = None,
+        log: list[str] | None = None,
+    ) -> None:
         self.rows: dict[tuple[int, UUID], StoredResponse] = dict(rows or {})
+        self.log = log if log is not None else []
 
     async def claim(
         self, dealership_id: int, key: UUID, request_hash: str
     ) -> StoredResponse | None:
+        self.log.append("claim")
         existing = self.rows.get((dealership_id, key))
         if existing is not None:
             return existing
@@ -158,7 +167,8 @@ class FakeUnitOfWork:
     """Snapshot on enter, restore on exception, so a rollback is observable.
 
     The port attributes are typed with the port Protocols (they are invariant); tests keep
-    their own handles to the concrete fakes passed in.
+    their own handles to the concrete fakes passed in. ``serialise`` writes ``"serialise"`` into
+    the log shared with ``FakeAppointments``.
     """
 
     def __init__(
@@ -173,6 +183,9 @@ class FakeUnitOfWork:
         self.rolled_back = False
         self._snapshot: tuple[dict[int, Appointment], dict[tuple[int, UUID], StoredResponse]]
         self._snapshot = ({}, {})
+
+    async def serialise(self, dealership_id: int) -> None:
+        self._fake_appointments.log.append("serialise")
 
     async def __aenter__(self) -> FakeUnitOfWork:
         self.committed = self.rolled_back = False
