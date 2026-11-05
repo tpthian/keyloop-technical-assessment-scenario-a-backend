@@ -31,7 +31,7 @@ Where each item the brief asks for lives in this repository.
 | Part 1, supporting: design evidence | Code that produced every spike trace cited in the design | [docs/evidence/spike/](docs/evidence/spike/): `schema.sql`, `race.py`, `race_savepoint.py` and their traces; rerun with `make spike` |
 | Part 1, supporting: GenAI in the design phase | Pipeline, gates, reviews, verification ledger, defects caught | [docs/ai/README.md](docs/ai/README.md), [docs/ai/verification-ledger.md](docs/ai/verification-ledger.md), [docs/ai/defects-caught.md](docs/ai/defects-caught.md), [docs/ai/reviews/](docs/ai/reviews/review-001.md) |
 | Part 2: Backend, API and data layer | Appointment booking API, availability check with no double booking under concurrency, multi-tenant data model | `src/scheduler/`, `migrations/`; API table in design.md section 3; Swagger UI at `/docs` when running |
-| Part 2: README, build, run, test | How to build, run and test | This file: Quick start, Running the demo, Testing |
+| Part 2: README, build, run, test | How to build, run and test | This file: Quick start, Running the demo, Testing; Swagger click-through in [docs/swagger-walkthrough.md](docs/swagger-walkthrough.md) |
 | Part 2: AI Collaboration Narrative | How AI was used in implementation, how its output was verified, what it got wrong | This file, section "AI Collaboration Narrative", in the author's voice; the evidence is in [docs/ai/](docs/ai/README.md) and [docs/ai/defects-caught.md](docs/ai/defects-caught.md) |
 | Part 2: Tests validating core logic | Tests for the booking guarantee, retry, idempotency, time rules | `tests/`, run with `make test` |
 | Part 3: Video | 5 to 10 minute walkthrough | Links at the top of this file: Google Drive (primary) and Loom; also in the submission email |
@@ -48,7 +48,7 @@ Read [docs/design.md](docs/design.md) first. The TL;DR gives the whole design in
 
 ## API
 
-Swagger UI at `http://localhost:8000/docs` when the service runs (`make run` or `make demo`). Design reference: [design.md section 3](docs/design.md), [ADR-008](docs/adr/ADR-008.md) for the idempotency boundary.
+Swagger UI at `http://localhost:8000/docs` when the service runs (`make run` or `make demo`). A click-through with values to paste, one request per route including the replay, the conflict and the vehicle refusal: [docs/swagger-walkthrough.md](docs/swagger-walkthrough.md). Design reference: [design.md section 3](docs/design.md), [ADR-008](docs/adr/ADR-008.md) for the idempotency boundary.
 
 | Method and path | Purpose |
 |---|---|
