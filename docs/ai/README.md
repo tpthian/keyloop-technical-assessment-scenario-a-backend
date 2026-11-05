@@ -24,7 +24,7 @@ This directory holds the artefacts of the procedure in [design.md section 6](../
 |---|---|---|---|
 | 1. Proposal | Human | Not written into a repository document before steps 2 and 3 | None |
 | 2. Challenge | AI | Every proposal receives a counter-argument or a named alternative | [Decision ownership](#decision-ownership) below |
-| 3. Decision log | Human decides; AI records | Each entry states context, options, choice, rationale and consequence | Working log outside the repository; each entry is restated in an ADR and cited as D-nnn ([../adr/](../adr/README.md)) |
+| 3. Decision log | Human decides; AI records | Each entry states context, options, choice, rationale and consequence | Working log outside the repository; each entry is restated in an ADR and cited as D-nnn ([../adr/](../adr/README.md)); the decisions the repository cites are registered in [../decisions.md](../decisions.md) |
 | 4. Draft docs | AI drafting agent | Drafted from the decision log only; each addition not in the log is listed for the author to accept or strike | [../design.md](../design.md), [../adr/](../adr/README.md) |
 | 5. Adversarial review | AI, separate agent, findings only, no edits | Each finding gets a disposition from the author before any edit | [reviews/review-001.md](reviews/review-001.md) |
 | 6. Live spike | AI runs; human reads the trace | A claim about the concurrency mechanism (constraint conflict, deadlock, savepoint recovery) enters the design only with a trace from a live database | [../evidence/spike/](../evidence/spike/) |
