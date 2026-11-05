@@ -202,10 +202,10 @@ This section is written in the author's voice; the rest of the repository is wri
 
 **The loop, once the design stood**
 
-- A SPEC in two parts: a Contract I gate, an Execution section the agents may revise. 16 acceptance criteria, 39 test cases.
+- A SPEC in two parts: a Contract I gate, an Execution section the agents may revise. 17 acceptance criteria, 40 test cases.
 - An adversarial review of the SPEC by a second AI, three cycles, before I approved it.
 - Fifteen implementation tasks, each in an isolated branch, each followed by a read-only audit from the second AI. Tests are exactly the SPEC test cases; the auditor never writes tests. Cap of three audit cycles, then it stops and comes to me.
-- Nine of the fifteen passed first time, three took two cycles, two took three, one took four by my exception. 43 audit and review runs in total, every final verdict a pass. 109 tests.
+- Nine of the fifteen passed first time, three took two cycles, two took three, one took four by my exception. 43 audit and review runs in total, every final verdict a pass. 110 tests.
 - Anything that touched the contract or the business logic came to me. I read, ruled, revised, and redesigned where the evidence demanded it.
 - After the code: two coherence walks of the design document and every ADR against the code, with the second AI cross-examining the walker, then a handful of small documentation commits under the gates alone. The documents describe the code that runs.
 
