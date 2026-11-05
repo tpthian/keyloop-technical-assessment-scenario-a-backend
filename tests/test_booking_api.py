@@ -1,4 +1,5 @@
-"""TC-21 to TC-27: booking and reading appointments through the API (AC-02, AC-03, AC-05, AC-08).
+"""TC-21 to TC-27 and TC-40: booking and reading appointments through the API (AC-02, AC-03,
+AC-05, AC-08, AC-17).
 
 Requests go through ``create_app`` on the testcontainers database with a fixed clock inside the
 90-day horizon. Test dealerships have ids >= 100, in ``Europe/London``, open Mon-Sat 08:00-18:00;
@@ -21,6 +22,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from scheduler.interfaces.http.limits import MAX_BODY_BYTES
 from scheduler.main import create_app
 from tests.conftest import booking_body, make_dealership
 from tests.fakes import FixedClock
@@ -241,6 +243,42 @@ async def test_back_to_back_on_one_pair_both_201(
     second = await _book(client, booking_body(vin="VINTWO", start_at="2027-03-26T10:00:00"))
     assert (first.status_code, second.status_code) == (201, 201)
     assert first.json()["end_at"] == second.json()["start_at"] == "2027-03-26T10:00:00Z"
+
+
+# TC-40: request bounds (ADR-014, D-058).
+
+
+async def test_oversized_body_is_413_and_over_long_string_is_422(
+    client: httpx.AsyncClient, engine: AsyncEngine
+) -> None:
+    await _one_pair(engine)
+    key = str(uuid4())
+    oversized = b" " * (MAX_BODY_BYTES + 1)
+    response = await client.post(
+        URL,
+        content=oversized,
+        headers={"Idempotency-Key": key, "Content-Type": "application/json"},
+    )
+    assert response.status_code == 413
+    assert response.json() == {
+        "code": "validation",
+        "message": f"request body exceeds {MAX_BODY_BYTES} bytes",
+    }
+    assert await _stored_code(engine, key) is None
+
+    key = str(uuid4())
+    response = await _book(client, booking_body(name="x" * 201), key)
+    assert response.status_code == 422
+    body = response.json()
+    assert (body["code"], body["message"]) == ("validation", "request does not match the schema")
+    assert body["errors"] == [
+        {
+            "loc": ["customer", "name"],
+            "msg": "String should have at most 200 characters",
+            "type": "string_too_long",
+        }
+    ]
+    assert await _stored_code(engine, key) is None
 
 
 # TC-27: happy path.

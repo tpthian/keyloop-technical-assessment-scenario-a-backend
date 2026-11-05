@@ -29,15 +29,24 @@ from scheduler.domain.canonical import normalise_vin
 
 _FORBID = ConfigDict(extra="forbid")
 
+# Upper bounds on every free string (ADR-014): bounded work per request and per stored row. Over
+# a bound is a schema 422. Email 254 is the SMTP path limit (RFC 5321); the raw VIN bound leaves
+# room for the spacing ``normalise_vin`` removes, its length is not otherwise checked.
+ID_MAX = 64
+EMAIL_MAX = 254
+NAME_MAX = 200
+VIN_MAX = 32
+MAKE_MODEL_MAX = 100
+
 
 class Customer(BaseModel):
     """``id`` or ``email`` is required (ADR-007)."""
 
     model_config = _FORBID
 
-    id: str | None = None
-    email: str | None = None
-    name: str | None = None
+    id: str | None = Field(default=None, max_length=ID_MAX)
+    email: str | None = Field(default=None, max_length=EMAIL_MAX)
+    name: str | None = Field(default=None, max_length=NAME_MAX)
 
     @model_validator(mode="after")
     def _has_identifier(self) -> Customer:
@@ -51,10 +60,10 @@ class Vehicle(BaseModel):
 
     model_config = _FORBID
 
-    id: str | None = None
-    vin: str | None = None
-    make: str | None = None
-    model: str | None = None
+    id: str | None = Field(default=None, max_length=ID_MAX)
+    vin: str | None = Field(default=None, max_length=VIN_MAX)
+    make: str | None = Field(default=None, max_length=MAKE_MODEL_MAX)
+    model: str | None = Field(default=None, max_length=MAKE_MODEL_MAX)
 
     @field_validator("vin", mode="after")
     @classmethod

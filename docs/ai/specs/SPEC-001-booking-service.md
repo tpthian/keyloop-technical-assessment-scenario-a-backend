@@ -212,6 +212,7 @@ Wide event, one JSON line on stdout per request, keys in this order: `v, ts, req
 - AC-14 Layers: `tests/test_architecture.py` passes: `domain` imports only the standard library and itself; `application` imports only `domain` and itself; `infrastructure` and `interfaces` never import each other; only `main` imports both.
 - AC-15 Use cases run without a database: `BookAppointment` is exercised end to end against in-memory fakes (claim, replay, validation, attempts, contention rollback), and the fakes implement the same Protocols as the PostgreSQL adapters (mypy checks structural conformance).
 - AC-16 Retry fallback (D-050): a writer that bypasses the dealership lock and takes a resource between the candidate read and the first INSERT costs the booking one attempt per lost resource; the booking lands on a remaining free pair (201) or ends with 409 `capacity_exhausted` when none remains; never a 5xx, never an overlap.
+- AC-17 Request bounds (D-058, ADR-014): a request body over `MAX_BODY_BYTES` (16 KiB) is 413 `validation` in the house error body, never stored; a free string over its `max_length` in `schemas.py` is a schema 422 with `errors`, never stored.
 
 ### Test Cases
 
@@ -258,6 +259,7 @@ Edge and regression first, happy path last. Layer in the fourth column.
 | TC-36 | `make lint` and `make test` green (manual, recorded) | AC-12 | — |
 | TC-37 | ADR-008 precedence: unknown dealership with a schema-invalid body (no identifier, unknown field) → 404 `not_found`, no key row; malformed JSON on an unknown dealership → 400; missing key on an unknown dealership → 400 | AC-04 | test_idempotency.py |
 | TC-38 | README inspection: `grep -c '^## API$\|^## Running the demo$\|^## Testing$' README.md` prints `3`; line 3 reads `Status: implemented; see Testing for the evidence.`; `git diff -U0 master -- README.md | grep '^@@'` lists hunks only at line 3 and inside the three sections (recorded in the status file with the hunk list) | AC-13 | README.md |
+| TC-40 | Request bounds (D-058): oversized body is 413; an over-long string is 422 with the house error body. A body of `MAX_BODY_BYTES + 1` bytes with a valid key → 413 `{"code": "validation", "message": "request body exceeds 16384 bytes"}`, no key row; `customer.name` of 201 characters → 422 `validation` with one `errors` item, `loc` `["customer", "name"]`, `type` `string_too_long`, no key row | AC-17 | test_booking_api.py (interfaces) |
 
 ### Propagation and Rollback
 
@@ -297,6 +299,7 @@ Commit protocol (D-040): one task is one or more commits; each commit reviewable
 | AC-14 | TC-14 | T1 | `uv run pytest tests/test_architecture.py -q` |
 | AC-15 | TC-09, 10, 11 | T6 | `uv run pytest tests/test_book_appointment_usecase.py -q` |
 | AC-16 | TC-39 | T11 | `uv run pytest tests/test_concurrency.py -q -s` |
+| AC-17 | TC-40 | T20 | `uv run pytest tests/test_booking_api.py -q` |
 
 ### Interfaces
 
@@ -847,6 +850,11 @@ Paths: `.github/workflows/ci.yml` (remove the postgres service and `DATABASE_URL
 "API": the five endpoints, the `Idempotency-Key` rule, the request and 201 example, the error body and the code table, Swagger at `/docs`. "Running the demo": `make demo`, the eight sections, last line `0`, clean rerun. "Testing": `make test` (Docker required), one line per test file and what it proves, the race test alone with output, the L-001 rule, "Known limitations": no request-level deadline; `statement_timeout` is per statement; a vehicle by VIN once and by id once yields two keys; hours and seed change by migration; the compose role is a superuser so the GRANT is documentary; no key cleanup job (SQL given).
 Done when: `make lint && make test` green; the local CI equivalent recorded in the status file (`uv run pre-commit run --all-files`, `uv run mypy src`, `uv run pytest -q`, and `.github/workflows/ci.yml` inspected to run exactly those); GitHub CI runs after the push is authorised (D-045); TC-38's three commands recorded in the status file; status file at `Status: awaiting-audit`. Commit: `SPEC-001 T13: CI on testcontainers, README API, demo and testing sections (design §3, §5)`.
 
+**T20: Security posture and request bounds** (design §7, ADR-014, D-058)
+Paths: `src/scheduler/interfaces/http/limits.py` (new: `BodySizeLimitMiddleware`, `MAX_BODY_BYTES`, `BodyTooLarge`), `errors.py` (413 handler), `schemas.py` (`max_length` on every free string), `main.py` (mount inside the wide-event middleware), `tests/test_booking_api.py` (TC-40 only), `docs/adr/ADR-014.md`, `docs/adr/README.md`, `docs/design.md`, `README.md`.
+The cap wraps `receive`: a declared `Content-Length` over the cap, or more bytes received than the cap, raises `BodyTooLarge` when the handler reads the body (ADR-008 step 1), so the 413 carries the route's wide event and never reaches the key store. HTTP layer only; no domain or application change.
+Done when: TC-40 passes; `uv run pre-commit run --files <changed>`, `uv run mypy src`, `uv run pytest -q` green. Commits: `SPEC-001 T20: <what> (design §7, ADR-014)`.
+
 ### Scope Amendments
 
 | Date | Approved by | Change | Reason |
@@ -859,3 +867,4 @@ Done when: `make lint && make test` green; the local CI equivalent recorded in t
 | 2026-11-05 | JP (D-050) | AC-16, TC-39 added to T11: retry-fallback test where a writer bypasses the dealership lock from the attempt gate; the `AttemptGate` seam stays for this purpose. TC-31 `attempts` sum becomes `== 4` with zero attempts per loser (D-048 audit cycle 3 F-001, Execution) | Under D-048 the retry loop fires only for writers around the lock; the fallback needs evidence, and the old `>= 8` was unimplementable |
 | 2026-11-05 | orchestrator (Execution, T14) | TC-39 row names the bypass bay and dealership of each case (bay 100 at dealership 100, bay 110 at dealership 110, as `tests/test_concurrency.py` uses); AC-16 listed after AC-15, numbering unchanged | Final coverage pass: the row said bay 100 for case (b) |
 | 2026-11-05 | orchestrator (Execution, T15) | Docs only: every ADR, design.md and README walked claim by claim against the code and tests; Codex F-1..F-12 on ADR-004 fixed in the body (latency budget an SLO allocation, not enforced; `SELECT ... FOR UPDATE` rejected, not implemented; retry-fallback claims scoped to what TC-39 proves; pool limit a hypothesis); no decision, code or test changed | JP: one coherent body before the videos |
+| 2026-11-05 | JP (D-058) | AC-17, TC-40 and task T20 added: request body cap (413) and `max_length` on every free string (schema 422); security posture recorded as ADR-014 and design §7 | Security was the unstated gap: the trust boundary was implied by "Authentication: upstream gateway" only |
