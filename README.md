@@ -196,18 +196,18 @@ This section is written in the author's voice; the rest of the repository is wri
 **How I directed the work**
 
 - I owned the problem. I read the brief, chose the backend scenario, and cut it to the one hard thing: no double booking of a bay, a technician or a vehicle under concurrency. I wrote the service model on paper first: dealership, bays, technicians, appointments as time ranges.
-- The AI's job was to challenge that sketch, not to replace it. Every challenge had to carry a measurement or a source. I decided every item that touched the contract or the code; every outcome is a numbered decision that names its origin: the brief, me, or AI-proposed and accepted by me. 56 decisions over three days.
+- The AI's job was to challenge that sketch, not to replace it. Every challenge had to carry a measurement or a source. I decided every item that touched the contract or the code; every outcome is a numbered decision that names its origin: the brief, me, or AI-proposed and accepted by me. more than fifty decisions over three days, each registered in the repository.
 - My first answer to double booking was a queue or an application-level check. The AI countered with PostgreSQL exclusion constraints and I made it prove the claim before I adopted it: a spike against a real database. The first spike hid the problem by staggering clients 50 ms apart. The adversarial review of that spike reproduced deadlocks in 9 of 11 transactions. The second spike, eight simultaneous writers with a savepoint per attempt, recovered from both failure modes with zero overlaps. That is the design we built.
 - Architecture, layer rules and code principles were fixed before the first line of code, and a test enforces the layer rule on every commit.
 
 **The loop, once the design stood**
 
-- A SPEC in two parts: a Contract I gate, an Execution section the agents may revise. 17 acceptance criteria, 40 test cases.
+- A SPEC in two parts: a Contract I gate, an Execution section the agents may revise. 16 acceptance criteria, 39 test cases when the loop closed.
 - An adversarial review of the SPEC by a second AI, three cycles, before I approved it.
 - Fifteen implementation tasks, each in an isolated branch, each followed by a read-only audit from the second AI. Tests are exactly the SPEC test cases; the auditor never writes tests. Cap of three audit cycles, then it stops and comes to me.
-- Nine of the fifteen passed first time, three took two cycles, two took three, one took four by my exception. 43 audit and review runs in total, every final verdict a pass. 110 tests.
+- Nine of the fifteen passed first time, three took two cycles, two took three, one took four by my exception. 43 audit and review runs in total when the loop closed, every final verdict a pass. 109 tests.
 - Anything that touched the contract or the business logic came to me. I read, ruled, revised, and redesigned where the evidence demanded it.
-- After the code: two coherence walks of the design document and every ADR against the code, with the second AI cross-examining the walker, then a handful of small documentation commits under the gates alone. The documents describe the code that runs.
+- After the code: two coherence walks of the design document and every ADR against the code, with the second AI cross-examining the walker, then a handful of small documentation commits under the gates alone. The documents describe the code that runs. On the last day two more tasks went through the same loop, each with its own audit: the security posture (ADR-014, one more acceptance criterion and one more test, so 17, 40 and 110 today) and a register of every decision the repository cites.
 
 **Where my judgement changed the outcome**
 
