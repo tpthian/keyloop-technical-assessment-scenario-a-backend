@@ -35,7 +35,7 @@ In scope:
 
 Out of scope, with reasons:
 - README "AI Collaboration Narrative", design.md section 6 and docs/ai code-phase rows: written after the code audit (D-038), not by the implementation.
-- Cancellation, rescheduling, admin APIs, notifications, `AppointmentConfirmed` outbox, key cleanup job, `/metrics`, background audit, UI: future work or cut (D-005, D-012, D-037).
+- Cancellation, rescheduling, admin APIs, notifications, `AppointmentConfirmed` outbox, key cleanup job, `/metrics`, background audit, UI: future work or cut (D-005, D-021, D-037).
 - Read-replica routing: documented only (ADR-004); `as_of` is `coalesce(pg_last_xact_replay_timestamp(), now())`, which is `now()` on a primary.
 - Resource retirement, per-dealership service offering, closures table: stated limitations.
 - Request-level deadline and pool sizing rule: limitation in ADR-004; the pool is sized so the concurrency test runs (10 + 10 overflow).
