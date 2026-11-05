@@ -25,7 +25,7 @@ Where each item the brief asks for lives in this repository.
 
 | Brief | Required content | File |
 |---|---|---|
-| Part 1: System Design Document | Architecture diagram, component roles, data flow, technologies with justification, observability strategy, GenAI in the design phase | [docs/design.md](docs/design.md), sections 1 to 6 in that order, with a TL;DR on top. Decisions and rejected alternatives: [docs/adr/](docs/adr/README.md) (ADR-001 to ADR-013) |
+| Part 1: System Design Document | Architecture diagram, component roles, data flow, technologies with justification, observability strategy, GenAI in the design phase | [docs/design.md](docs/design.md), sections 1 to 6 in that order, with a TL;DR on top, and section 7 on security. Decisions and rejected alternatives: [docs/adr/](docs/adr/README.md) (ADR-001 to ADR-014) |
 | Part 1, supporting: design evidence | Code that produced every spike trace cited in the design | [docs/evidence/spike/](docs/evidence/spike/): `schema.sql`, `race.py`, `race_savepoint.py` and their traces; rerun with `make spike` |
 | Part 1, supporting: GenAI in the design phase | Pipeline, gates, reviews, verification ledger, defects caught | [docs/ai/README.md](docs/ai/README.md), [docs/ai/verification-ledger.md](docs/ai/verification-ledger.md), [docs/ai/defects-caught.md](docs/ai/defects-caught.md), [docs/ai/reviews/](docs/ai/reviews/review-001.md) |
 | Part 2: Backend, API and data layer | Appointment booking API, availability check with no double booking under concurrency, multi-tenant data model | `src/scheduler/`, `migrations/`; API table in design.md section 3; Swagger UI at `/docs` when running |
@@ -36,7 +36,7 @@ Where each item the brief asks for lives in this repository.
 
 ## System design
 
-Read [docs/design.md](docs/design.md) first. The TL;DR gives the whole design in a page; the six sections follow the brief's list. Each decision has an ADR in [docs/adr/](docs/adr/README.md) with the alternatives rejected.
+Read [docs/design.md](docs/design.md) first. The TL;DR gives the whole design in a page; sections 1 to 6 follow the brief's list; section 7 states the security posture and its trust boundary. Each decision has an ADR in [docs/adr/](docs/adr/README.md) with the alternatives rejected.
 
 ## Design evidence
 
@@ -107,7 +107,7 @@ Every non-2xx response has the body `{"code": "<code>", "message": "<text>", "er
 | Code | Status | Final | Stored with the key |
 |---|---|---|---|
 | `confirmed` | 201 | yes | yes |
-| `validation` (schema, before the transaction) | 400 malformed JSON or key; 422 schema | yes | no |
+| `validation` (schema, before the transaction) | 400 malformed JSON or key; 413 body over 16 KiB (ADR-014); 422 schema | yes | no |
 | `not_found` | 404 | yes | no |
 | `validation` (business: hours, past, horizon, DST gap, service type, qualification) | 422 | yes | yes |
 | `replay_conflict` | 422 | yes | no (the original row stays) |
@@ -156,7 +156,7 @@ The tests start their own PostgreSQL 16 container with testcontainers (ADR-002) 
 | `tests/test_book_appointment_usecase.py` | application | The booking use case on in-memory fakes: replay, `replay_conflict`, business 422 recorded, scripted reserve outcomes, `contention` rolled back with nothing recorded, the dealership lock taken after the claim and never on a replay |
 | `tests/test_postgres_adapters.py` | infrastructure | `reserve` maps 23P01 to `ResourceTaken` and the transaction continues after the savepoint, and re-raises any other error; `claim`, `record`, `free_candidates`; `serialise` holds the dealership's advisory lock until COMMIT |
 | `tests/test_seed.py` | infrastructure | The seed and the nine named constraints, `btree_gist` installed |
-| `tests/test_booking_api.py` | interfaces | 201 body, business 422s, `vehicle_already_booked`, `capacity_exhausted`, tenancy foreign keys, `GET` by id, back-to-back slots |
+| `tests/test_booking_api.py` | interfaces | 201 body, business 422s, `vehicle_already_booked`, `capacity_exhausted`, tenancy foreign keys, `GET` by id, back-to-back slots, request bounds (413 over the body cap, 422 on an over-long string; TC-40) |
 | `tests/test_idempotency.py` | interfaces | The ADR-008 boundary rows before and at the claim: 400 malformed JSON or key, 404, schema 422 with no key row and a corrected body under the same key, business 422 replayed or `replay_conflict`, 201 replayed with one appointment, and the order 400, 404, then schema 422. The concurrent same-key row is TC-20, the final-409 replay is TC-22, the attempt and `contention` rows are TC-01, TC-11, TC-12 and TC-39; crash points and 5xx are not tested |
 | `tests/test_availability.py` | interfaces | Window limits, the ADR-010 worked example, an empty schedule |
 | `tests/test_events.py` | interfaces | One wide event per response, 17 keys in order, `final` classification, no email or VIN in any line |
@@ -196,7 +196,7 @@ This section is written in the author's voice; the rest of the repository is wri
 **How I directed the work**
 
 - I owned the problem. I read the brief, chose the backend scenario, and cut it to the one hard thing: no double booking of a bay, a technician or a vehicle under concurrency. I wrote the service model on paper first: dealership, bays, technicians, appointments as time ranges.
-- The AI's job was to challenge that sketch, not to replace it. Every challenge had to carry a measurement or a source. I decided each item; every outcome is a numbered decision that names its origin: the brief, me, or AI-proposed and accepted by me. 56 decisions over three days.
+- The AI's job was to challenge that sketch, not to replace it. Every challenge had to carry a measurement or a source. I decided every item that touched the contract or the code; every outcome is a numbered decision that names its origin: the brief, me, or AI-proposed and accepted by me. 56 decisions over three days.
 - My first answer to double booking was a queue or an application-level check. The AI countered with PostgreSQL exclusion constraints and I made it prove the claim before I adopted it: a spike against a real database. The first spike hid the problem by staggering clients 50 ms apart. The adversarial review of that spike reproduced deadlocks in 9 of 11 transactions. The second spike, eight simultaneous writers with a savepoint per attempt, recovered from both failure modes with zero overlaps. That is the design we built.
 - Architecture, layer rules and code principles were fixed before the first line of code, and a test enforces the layer rule on every commit.
 
@@ -213,8 +213,9 @@ This section is written in the author's voice; the rest of the repository is wri
 
 - The race test proved correctness but failed the latency budget: the split held in 9 of 20 runs, deadlocks between writers, peaks of 1.2 to 1.4 seconds. The implementer offered to relax the test. I kept the test exact and ruled for a per-dealership advisory lock after the idempotency claim, with the retry kept as the fallback for writers outside the lock. Since then: 19 of 19 runs, zero deadlocks, about 110 to 150 ms.
 - An ADR had its change appended as an amendment while the body still described the old model. It passed eight AI audit cycles across four gates. I caught it from one table and asked "has this been validated?". That became a claim-by-claim walk of every ADR against the code: 51 corrections.
-- The AI once wrote a 1,000-site scale figure as if the brief had given it. I struck it. Numbers in this repository say where they come from.
+- The AI once wrote a 1,000-site scale figure as if the brief had given it. I made it say so. Numbers in this repository say where they come from.
 - The AI proposed a 90-day booking horizon the brief never asked for. I kept it, and made the ADR say what it is: an operational assumption standing in for published roster depth, with the rule that will replace it.
+- On the last day I raised security as the gap nobody had asked about. I had it written down as a trust boundary, with its one open hole, tenant binding, named rather than left implied.
 
 **Rules that bounded the agents**
 
