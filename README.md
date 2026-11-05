@@ -25,7 +25,7 @@ Where each item the brief asks for lives in this repository.
 
 | Brief | Required content | File |
 |---|---|---|
-| Part 1: System Design Document | Architecture diagram, component roles, data flow, technologies with justification, observability strategy, GenAI in the design phase | [docs/design.md](docs/design.md), sections 1 to 6 in that order, with a TL;DR on top. Decisions and rejected alternatives: [docs/adr/](docs/adr/README.md) (ADR-001 to ADR-013) |
+| Part 1: System Design Document | Architecture diagram, component roles, data flow, technologies with justification, observability strategy, GenAI in the design phase | [docs/design.md](docs/design.md), sections 1 to 6 in that order, with a TL;DR on top. Decisions and rejected alternatives: [docs/adr/](docs/adr/README.md) (ADR-001 to ADR-013); decision register: [docs/decisions.md](docs/decisions.md) |
 | Part 1, supporting: design evidence | Code that produced every spike trace cited in the design | [docs/evidence/spike/](docs/evidence/spike/): `schema.sql`, `race.py`, `race_savepoint.py` and their traces; rerun with `make spike` |
 | Part 1, supporting: GenAI in the design phase | Pipeline, gates, reviews, verification ledger, defects caught | [docs/ai/README.md](docs/ai/README.md), [docs/ai/verification-ledger.md](docs/ai/verification-ledger.md), [docs/ai/defects-caught.md](docs/ai/defects-caught.md), [docs/ai/reviews/](docs/ai/reviews/review-001.md) |
 | Part 2: Backend, API and data layer | Appointment booking API, availability check with no double booking under concurrency, multi-tenant data model | `src/scheduler/`, `migrations/`; API table in design.md section 3; Swagger UI at `/docs` when running |
