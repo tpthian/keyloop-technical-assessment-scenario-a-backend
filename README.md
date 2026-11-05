@@ -157,7 +157,7 @@ The tests start their own PostgreSQL 16 container with testcontainers (ADR-002) 
 | `tests/test_postgres_adapters.py` | infrastructure | `reserve` maps 23P01 to `ResourceTaken` and the transaction continues after the savepoint, and re-raises any other error; `claim`, `record`, `free_candidates`; `serialise` holds the dealership's advisory lock until COMMIT |
 | `tests/test_seed.py` | infrastructure | The seed and the nine named constraints, `btree_gist` installed |
 | `tests/test_booking_api.py` | interfaces | 201 body, business 422s, `vehicle_already_booked`, `capacity_exhausted`, tenancy foreign keys, `GET` by id, back-to-back slots |
-| `tests/test_idempotency.py` | interfaces | Every row of the ADR-008 boundary, including the order 400, 404, then schema 422 |
+| `tests/test_idempotency.py` | interfaces | The ADR-008 boundary rows before and at the claim: 400 malformed JSON or key, 404, schema 422 with no key row and a corrected body under the same key, business 422 replayed or `replay_conflict`, 201 replayed with one appointment, and the order 400, 404, then schema 422. The concurrent same-key row is TC-20, the final-409 replay is TC-22, the attempt and `contention` rows are TC-01, TC-11, TC-12 and TC-39; crash points and 5xx are not tested |
 | `tests/test_availability.py` | interfaces | Window limits, the ADR-010 worked example, an empty schedule |
 | `tests/test_events.py` | interfaces | One wide event per response, 17 keys in order, `final` classification, no email or VIN in any line |
 | `tests/test_health.py` | interfaces | `/health/live` 200; `/health/ready` 200, and 503 with an unreachable database |
