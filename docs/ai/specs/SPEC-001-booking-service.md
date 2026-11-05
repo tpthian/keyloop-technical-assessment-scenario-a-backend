@@ -11,7 +11,7 @@ Branch: feat/spec-001-booking-service
 Production Branch: master
 Sub-repo: keyloop-technical-assessment-scenario-a-backend (single repository; every path below is relative to its root)
 
-Contract sources: `docs/design.md`, `docs/adr/ADR-001.md` to `ADR-013.md`. This SPEC is the ticket breakdown: one task per commit series, every commit traceable to a task and to a design section or ADR. Reader: an engineer reviewing or implementing. Code appears only where correctness is subtle (DDL, the booking transaction, the reserve adapter, the concurrency test); everything else is interface, rule and sequence.
+Contract sources: `docs/design.md`, `docs/adr/ADR-001.md` to `ADR-014.md` (ADR-014 from D-058). This SPEC is the ticket breakdown: one task per commit series, every commit traceable to a task and to a design section or ADR. Reader: an engineer reviewing or implementing. Code appears only where correctness is subtle (DDL, the booking transaction, the reserve adapter, the concurrency test); everything else is interface, rule and sequence.
 
 ## § Contract
 
@@ -851,7 +851,7 @@ Paths: `.github/workflows/ci.yml` (remove the postgres service and `DATABASE_URL
 Done when: `make lint && make test` green; the local CI equivalent recorded in the status file (`uv run pre-commit run --all-files`, `uv run mypy src`, `uv run pytest -q`, and `.github/workflows/ci.yml` inspected to run exactly those); GitHub CI runs after the push is authorised (D-045); TC-38's three commands recorded in the status file; status file at `Status: awaiting-audit`. Commit: `SPEC-001 T13: CI on testcontainers, README API, demo and testing sections (design §3, §5)`.
 
 **T20: Security posture and request bounds** (design §7, ADR-014, D-058)
-Paths: `src/scheduler/interfaces/http/limits.py` (new: `BodySizeLimitMiddleware`, `MAX_BODY_BYTES`, `BodyTooLarge`), `errors.py` (413 handler), `schemas.py` (`max_length` on every free string), `main.py` (mount inside the wide-event middleware), `tests/test_booking_api.py` (TC-40 only), `docs/adr/ADR-014.md`, `docs/adr/README.md`, `docs/design.md`, `README.md`.
+Paths: `src/scheduler/interfaces/http/limits.py` (new: `BodySizeLimitMiddleware`, `MAX_BODY_BYTES`, `BodyTooLarge`), `errors.py` (413 handler), `schemas.py` (`max_length` on every free string), `main.py` (mount inside the wide-event middleware), `appointments.py` (413 in the OpenAPI responses), `tests/test_booking_api.py` (TC-40 only), `docs/adr/ADR-014.md`, `docs/adr/README.md`, `docs/design.md`, `README.md`.
 The cap wraps `receive`: a declared `Content-Length` over the cap, or more bytes received than the cap, raises `BodyTooLarge` when the handler reads the body (ADR-008 step 1), so the 413 carries the route's wide event and never reaches the key store. HTTP layer only; no domain or application change.
 Done when: TC-40 passes; `uv run pre-commit run --files <changed>`, `uv run mypy src`, `uv run pytest -q` green. Commits: `SPEC-001 T20: <what> (design §7, ADR-014)`.
 
@@ -869,3 +869,4 @@ Done when: TC-40 passes; `uv run pre-commit run --files <changed>`, `uv run mypy
 | 2026-11-05 | orchestrator (Execution, T15) | Docs only: every ADR, design.md and README walked claim by claim against the code and tests; Codex F-1..F-12 on ADR-004 fixed in the body (latency budget an SLO allocation, not enforced; `SELECT ... FOR UPDATE` rejected, not implemented; retry-fallback claims scoped to what TC-39 proves; pool limit a hypothesis); no decision, code or test changed | JP: one coherent body before the videos |
 | 2026-11-05 | JP (D-058) | AC-17, TC-40 and task T20 added: request body cap (413) and `max_length` on every free string (schema 422); security posture recorded as ADR-014 and design §7 | Security was the unstated gap: the trust boundary was implied by "Authentication: upstream gateway" only |
 | 2026-11-05 | orchestrator (Execution, T20) | AC-04 and the HTTP layer handler order name the 413 of AC-17 | Codex T20 cycle 1: the ADR-008 row and the handler sequence omitted the 413 |
+| 2026-11-05 | orchestrator (Execution, T20) | Contract sources extend to ADR-014; T20 paths gain `appointments.py` (413 listed in the booking route's OpenAPI responses) | Codex T20 cycle 2: sources ended at ADR-013; `/openapi.json` omitted the 413 |
