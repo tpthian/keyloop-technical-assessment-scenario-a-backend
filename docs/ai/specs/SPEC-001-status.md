@@ -146,3 +146,10 @@ Gates on ac9c619: `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock uv
 Cross-check: docs/ai/reviews/SPEC-001-T20-audit.md, Codex read-only, 3 cycles: revise (8 findings), revise (4), revise (4); all 16 fixed. Cycle 3 findings fixed after the cap in ac9c619, not re-verified.
 Deviations: the TC list sits in § Contract, so TC-40 and AC-17 are Contract additions under D-058; `appointments.py` lists 413 in the OpenAPI responses (cycle 2, documentation of the response, no behaviour change); consistency rows added outside the named files: ADR-008 boundary table, ADR-013 SLI and null-counter list, SPEC wire-format table and HTTP-layer handler order, README pre-transaction list and test table; README narrative counts updated to 17 AC, 40 TC, 110 tests (cycle 1).
 Open for the author: the README narrative's "43 audit and review runs" and "56 decisions" predate T20 (3 more Codex runs; D-058); the production `/docs` setting and tenant binding are deferred in ADR-014.
+
+## T21
+
+Decision register, docs only, from f79be29. Commits: 99e83cc (`docs/decisions.md`: one row per D-nnn id the repository cites, 36 ids, plus D-058 and D-059; pointers in `docs/ai/README.md` pipeline step 3, `docs/adr/README.md`, README deliverables map), 68ac7f6 (cycle 1 fixes), 15ee258 and 544f7f5 (cycle 2 fixes), and this status commit with the audit.
+Cross-check: docs/ai/reviews/SPEC-001-T21-audit.md, Codex, 3 cycles: revise (9), revise (7), approve.
+Gates: `uv run pre-commit run --files` on every changed file green at each commit.
+Deviations: the D-058 row points at ADR-014 and design.md §7, which land with T20; at this commit the link does not resolve. Citing passages are not changed: `docs/adr/ADR-004.md:17` and `docs/adr/ADR-007.md:11` cite D-036 for rules its row does not cover, and `docs/ai/specs/SPEC-001-booking-service.md:38` cites D-012 for out-of-scope items; reported to the author.

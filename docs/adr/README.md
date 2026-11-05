@@ -2,6 +2,8 @@
 
 Each record is short and cites, as D-nnn, the entry of the working decision log it comes from; the log itself stays outside the repository and each record restates its decision in full. Design document: [../design.md](../design.md).
 
+Every D-nnn the repository cites is resolved in the decision register: [../decisions.md](../decisions.md).
+
 | ADR | Title | Summary |
 |---|---|---|
 | [001](ADR-001.md) | Scenario and layer | Scenario A, backend only; client stubbed. |
