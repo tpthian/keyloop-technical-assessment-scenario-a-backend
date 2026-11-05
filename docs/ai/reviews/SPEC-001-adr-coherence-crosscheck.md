@@ -2,7 +2,7 @@
 
 Adversarial read of `docs/adr/*.md`, `docs/design.md`, `README.md` and `docs/ai/specs/SPEC-001-booking-service.md` against `src/**` and `tests/**`, by Codex (`codex exec -s read-only`), after the T15 walk (C1 033f657, C2 077a6d1, C3 e2d099b, C4 c13951f). Codex had no Docker; the gate results (pytest 109 passed, mypy, pre-commit) are the orchestrating session's.
 
-Cycles: 3 of a maximum of 3. Final verdict: revise. Cycle 1 F-1..F-10, cycle 2 F-11..F-13, cycle 3 F-14. Dispositions:
+Cycles: 3 of a maximum of 3, plus one narrow re-check of the last fix. Final verdict: approve. Cycle 1 F-1..F-10, cycle 2 F-11..F-13, cycle 3 F-14, re-check of F-14 approve. Dispositions:
 
 | Finding | Disposition | Commit |
 |---|---|---|
@@ -43,4 +43,12 @@ F-13 — `docs/adr/ADR-004.md:15` — "The spikes and the concurrency test start
 ```text
 Verdict: revise
 F-14 — `README.md:160` — "Every row of the ADR-008 boundary, including the order 400, 404, then schema 422" — replace with the rows `tests/test_idempotency.py` actually covers; it contains no coverage for 23P01, 40P01, contention, crashes, 5xx, or final-409 replay rows.
+```
+
+## Re-check of F-14 output (verbatim)
+
+Scope: the rewritten `tests/test_idempotency.py` row in README.md against the test file and the ADR-008 table; read-only.
+
+```
+Verdict: approve
 ```
