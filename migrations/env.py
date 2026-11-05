@@ -3,6 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from scheduler.infrastructure.postgres.schema import metadata
 from scheduler.settings import get_settings
 
 config = context.config
@@ -11,8 +12,8 @@ if config.config_file_name is not None:
 
 config.set_main_option("sqlalchemy.url", get_settings().DATABASE_URL.replace("%", "%%"))
 
-# Set to the models' MetaData once models exist.
-target_metadata = None
+# The Core tables mirror migration 0001; the migrations own the DDL (design §2, ADR-004).
+target_metadata = metadata
 
 
 def run_migrations_offline() -> None:

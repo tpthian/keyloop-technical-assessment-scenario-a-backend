@@ -38,7 +38,7 @@ This directory holds the artefacts of the procedure in [design.md section 6](../
 | Topic | Human proposal | AI challenge | Decision | Decided by |
 |---|---|---|---|---|
 | Who owns bay and technician calendars (ADR-003) | A separate "ServiceBay service" owns dealerships, bays, slots and technicians; the scheduler looks them up | "Check then confirm" becomes a cross-service write with no shared transaction; the guarantee becomes a saga or reservation protocol | The scheduler owns bays, technicians, skills and the calendar | Human, adopting the challenge |
-| How double booking is prevented (ADR-004) | A FIFO queue or an application-level check | PostgreSQL exclusion constraints with commit-order arbitration; a queue gives an asynchronous "accepted", a broker and a throughput cap; an application lock is not valid across instances | Exclusion constraints; FIFO, application lock and `SELECT ... FOR UPDATE` rejected, the last kept as fallback adapter | Human, adopting the challenge |
+| How double booking is prevented (ADR-004) | A FIFO queue or an application-level check | PostgreSQL exclusion constraints with commit-order arbitration; a queue gives an asynchronous "accepted", a broker and a throughput cap; an application lock is not valid across instances | Exclusion constraints; FIFO, application lock and `SELECT ... FOR UPDATE` rejected, none implemented | Human, adopting the challenge |
 | Idempotency key (ADR-008) | Key derived from request content | A retry and a deliberate later rebooking of the same car are indistinguishable by content | Mandatory client-generated key, now a UUID | Human, adopting the challenge |
 | CRM on the booking path (ADR-007) | Never turn a customer away over data quality; the CRM reconciles later | CRM as a port with a stub adapter; open question whether to validate IDs synchronously against the CRM, fail-closed | Booking never calls the CRM; the scheduler is an intake point; the CRM reconciles from `AppointmentConfirmed` | Human, overriding the AI |
 | Scope and demonstration surface (ADR-012) | Is a UI needed to demonstrate a backend? Standing rule: thinking over code, demonstrable, never perfected | No custom UI: Swagger UI and a demo script; a UI costs about half a day and cannot show the concurrency guarantee | Cover the challenge exactly; Swagger UI, demo script and curl; no custom frontend | Human |
@@ -69,10 +69,10 @@ Defects caught before code, with what each changed: [defects-caught.md](defects-
 | Adversarial review | [reviews/review-001.md](reviews/review-001.md) | Design |
 | Second-model review | [reviews/review-002.md](reviews/review-002.md) | Design |
 | Verification ledger | [verification-ledger.md](verification-ledger.md) | Design, continued in implementation |
-| Defects caught before code | [defects-caught.md](defects-caught.md) | Design |
-| SPEC (contract and execution plan per task) | Added when produced | Implementation |
-| SPEC review (second model) | Added when produced | Implementation |
-| Code audit against the SPEC | Added when produced | Implementation |
-| AI Collaboration Narrative | `README.md` at the repository root, written in the implementation phase | Implementation |
+| Defects caught | [defects-caught.md](defects-caught.md) | Design, continued in implementation |
+| SPEC (contract and execution plan per task) | [specs/SPEC-001-booking-service.md](specs/SPEC-001-booking-service.md); per-task status, gates and deviations in [specs/SPEC-001-status.md](specs/SPEC-001-status.md) | Implementation |
+| SPEC review (second model) | [reviews/SPEC-001-spec-review.md](reviews/SPEC-001-spec-review.md) | Implementation |
+| Code audit against the SPEC | Whole SPEC: [reviews/SPEC-001-code-audit.md](reviews/SPEC-001-code-audit.md); one audit per task series: `reviews/SPEC-001-T<n>-audit.md` | Implementation |
+| AI Collaboration Narrative | `README.md` at the repository root, section "AI Collaboration Narrative", in the author's voice | Implementation |
 
-Implementation-phase roles: spec author (Claude), spec reviewer (Codex), implementation agent, code auditor (Claude), each a separate agent with its own artefact here.
+Implementation-phase roles: spec author (Claude), spec reviewer (Codex), implementation agent, code auditor (Codex, read-only), each a separate agent with its own artefact here.
