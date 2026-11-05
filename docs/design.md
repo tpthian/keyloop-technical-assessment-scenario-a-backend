@@ -96,6 +96,7 @@ erDiagram
 - Rule: `vehicle_key` is the VIN, upper case with whitespace removed, when given, else `id:<vehicle id>`.
 - Rule: the database enforces non-overlap and tenancy; qualification, `end_at` and opening hours are enforced on the single write path.
 - Full DDL: ADR-004.
+- Rule: the code has four layers and a composition root: `domain` imports only the standard library, `application` (use cases and ports) only `domain`, `infrastructure` and `interfaces` never import each other, and `main` is the only module importing both; `tests/test_architecture.py` enforces it on every commit (D-038, D-041).
 
 ## 3. Data flow
 
