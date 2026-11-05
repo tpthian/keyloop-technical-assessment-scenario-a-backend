@@ -78,3 +78,20 @@ Findings:
 Verdict: revise
 
 Cap reached with findings open: BLOCKED. All four findings fixed in ac9c619 after the cap; that commit is not re-verified by Codex. Gates on ac9c619 as above.
+
+## Re-check of the cycle-3 fixes, ac9c619 (seat, read-only, D-052; verbatim)
+
+```
+F-1: fixed
+F-2: fixed
+F-3: fixed
+F-4: fixed
+Verdict: approve
+tokens used
+26,293
+F-1: fixed
+F-2: fixed
+F-3: fixed
+F-4: fixed
+Verdict: approve
+```

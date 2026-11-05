@@ -140,7 +140,7 @@ Gates: `uv run pytest -q` 109 passed; `uv run mypy src tests/fakes.py` clean; `u
 
 ## T20 (security posture and request bounds, D-058)
 
-Status: BLOCKED at the Codex cap; every finding fixed, the last fix commit not re-verified.
+Status: audited. Codex 3 cycles (8, 4, 4 findings, all fixed), then a narrow read-only re-check of the last fix commit ac9c619 (D-052): approve.
 Commits on leg/t20-security (BASE f79be29): 84f6f7c (body cap 413, `max_length` on every free string, TC-40, SPEC AC-17/TC-40/T20/amendment), 35007fe (ADR-014, ADR index row, design §7 and TL;DR row, 413 in ADR-008 and the ADR-013 SLI), 023385b (README), c20d9c2 (cycle 1 fixes), d87c51f (cycle 2 fixes), ac9c619 (cycle 3 fixes, unverified by Codex), and this status commit with the audit.
 Gates on ac9c619: `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock uv run pytest -q` → 110 passed; `uv run mypy src` → no issues in 34 source files; `uv run pre-commit run --all-files` → all hooks passed.
 Cross-check: docs/ai/reviews/SPEC-001-T20-audit.md, Codex read-only, 3 cycles: revise (8 findings), revise (4), revise (4); all 16 fixed. Cycle 3 findings fixed after the cap in ac9c619, not re-verified.
