@@ -359,7 +359,8 @@ class UnitOfWork(Protocol):
     reads: SchedulingReadRepository  # same connection, for in-transaction reference reads
 
     # transaction-scoped advisory lock (pg_advisory_xact_lock): bookings of one dealership run
-    # one at a time; no lock cycles, so no 40P01 under contention (ADR-004 amendment, D-048)
+    # one at a time; between writers that honour it no lock cycles form, so no 40P01 under
+    # contention (ADR-004 amendment, D-048); a writer outside it meets the retry fallback (D-050)
     async def serialise(self, dealership_id: int) -> None: ...
 
     async def __aenter__(self) -> "UnitOfWork": ...
@@ -857,3 +858,4 @@ Done when: `make lint && make test` green; the local CI equivalent recorded in t
 | 2026-11-05 | JP (D-049) | TC-31, AC-07, T11 block: the race synchronises the 8 clients before they send (`asyncio.Barrier` in the test, no attempt gate); AC-07 and the T11 example aligned with the D-044 fixture (4 bays x 4 technicians); TC-11 unchanged | D-048 audit cycle 2: an attempt gate inside the transaction deadlocks against the dealership lock taken before it |
 | 2026-11-05 | JP (D-050) | AC-16, TC-39 added to T11: retry-fallback test where a writer bypasses the dealership lock from the attempt gate; the `AttemptGate` seam stays for this purpose. TC-31 `attempts` sum becomes `== 4` with zero attempts per loser (D-048 audit cycle 3 F-001, Execution) | Under D-048 the retry loop fires only for writers around the lock; the fallback needs evidence, and the old `>= 8` was unimplementable |
 | 2026-11-05 | orchestrator (Execution, T14) | TC-39 row names the bypass bay and dealership of each case (bay 100 at dealership 100, bay 110 at dealership 110, as `tests/test_concurrency.py` uses); AC-16 listed after AC-15, numbering unchanged | Final coverage pass: the row said bay 100 for case (b) |
+| 2026-11-05 | orchestrator (Execution, T15) | Docs only: every ADR, design.md and README walked claim by claim against the code and tests; Codex F-1..F-12 on ADR-004 fixed in the body (latency budget an SLO allocation, not enforced; `SELECT ... FOR UPDATE` rejected, not implemented; retry-fallback claims scoped to what TC-39 proves; pool limit a hypothesis); no decision, code or test changed | JP: one coherent body before the videos |
