@@ -217,10 +217,14 @@ if [[ "$won" != "2" || "$exhausted" != "6" ]]; then
   echo "demo.sh: the race split differs from the expected 2 x 201, 6 x capacity_exhausted" >&2
   exit 1
 fi
-echo "last $RACE_CLIENTS book_appointment events (docker compose logs api):"
+echo "last $RACE_CLIENTS book_appointment events (docker compose logs api), one line each:"
 docker compose logs --no-color --no-log-prefix api \
   | jq -cR 'fromjson? | select(type == "object" and .route == "book_appointment")' \
-  | tail -n "$RACE_CLIENTS"
+  | tail -n "$RACE_CLIENTS" >"$OUT/race-events.jsonl"
+jq -r '"\(.ts)  \(.outcome) \(.code)  attempts=\(.attempts) deadlocks=\(.deadlocks)"
+  + " pruned=\(.candidates_pruned) latency_ms=\(.latency_ms)"' "$OUT/race-events.jsonl"
+echo "one event in full (ADR-013: one wide line per request, no email or VIN):"
+tail -n 1 "$OUT/race-events.jsonl" | jq .
 
 section "8. Overlap count (design section 5), must be 0"
 overlaps="$(psql_value "$OVERLAP_SQL")"

@@ -133,7 +133,7 @@ make down && make demo # clean rerun on a fresh database
 4. Same key, different body: 422 `replay_conflict`.
 5. Same car (VIN sent in lower case with a space), new key, overlapping 09:30: 409 `vehicle_already_booked`.
 6. Availability for the Oil change on that Monday: windows per pair and `as_of`.
-7. The race: 8 concurrent clients book one slot on the Monday after. Two bays and two technicians allow two winners, so the expected split is 2 x 201 and 6 x 409 `capacity_exhausted`; one line per client, then the last 8 `book_appointment` events from `docker compose logs api`.
+7. The race: 8 concurrent clients book one slot on the Monday after. Two bays and two technicians allow two winners, so the expected split is 2 x 201 and 6 x 409 `capacity_exhausted`; one line per client, then the last 8 `book_appointment` events from `docker compose logs api`, one summary line each (outcome, code, attempts, deadlocks, pruned candidates, latency) and one event printed in full (ADR-013).
 8. The overlap query of design section 5, printed last.
 
 The last printed line is the overlap count and must be `0`. Each response is written to its own file under a temporary directory whose path is printed first. The script stops with a message when a response differs from the expected one, and refuses to run against a database that already holds appointments; `make down && make demo` starts clean.
