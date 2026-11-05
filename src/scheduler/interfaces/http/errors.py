@@ -6,8 +6,8 @@ request path into ``{"code", "message", "errors"?}`` bodies and write the code i
 event, so every error line carries its ``code`` (ADR-013). ``errors`` appears only on a schema
 422 and holds ``loc``, ``msg`` and ``type`` per item.
 
-Responses of ADR-008 steps 1 to 3 (400 malformed JSON or key, 404 unknown dealership, schema
-422) are produced here and never reach the idempotency store.
+Responses of ADR-008 steps 1 to 3 (400 malformed JSON or key, 413 body over the cap, 404 unknown
+dealership, schema 422) are produced here and never reach the idempotency store.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from scheduler.domain.errors import NotFound, ReplayConflict, ValidationFailed
+from scheduler.interfaces.http.limits import BodyTooLarge
 from scheduler.interfaces.http.schemas import error_items
 
 VALIDATION = "validation"
@@ -40,6 +41,7 @@ STATUS_OF_CODE: Mapping[str, int] = {
     "error": 500,
 }
 BAD_REQUEST = 400  # malformed JSON, missing or non-UUID Idempotency-Key: code ``validation``
+PAYLOAD_TOO_LARGE = 413  # body over ``limits.MAX_BODY_BYTES``: code ``validation`` (ADR-014)
 SCHEMA_MESSAGE = "request does not match the schema"
 
 
@@ -72,6 +74,11 @@ def error_response(
 async def _bad_request(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, BadRequest)
     return error_response(request, BAD_REQUEST, VALIDATION, exc.message)
+
+
+async def _body_too_large(request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, BodyTooLarge)
+    return error_response(request, PAYLOAD_TOO_LARGE, VALIDATION, exc.message)
 
 
 async def _malformed_json(request: Request, exc: Exception) -> JSONResponse:
@@ -110,6 +117,7 @@ async def _http_error(request: Request, exc: Exception) -> JSONResponse:
 def register_handlers(app: FastAPI) -> None:
     """Mount every handler; a domain error not listed here is a 5xx through the middleware."""
     app.add_exception_handler(BadRequest, _bad_request)
+    app.add_exception_handler(BodyTooLarge, _body_too_large)
     app.add_exception_handler(json.JSONDecodeError, _malformed_json)
     app.add_exception_handler(ValidationError, _schema_invalid)
     app.add_exception_handler(RequestValidationError, _schema_invalid)

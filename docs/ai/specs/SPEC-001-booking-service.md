@@ -11,7 +11,7 @@ Branch: feat/spec-001-booking-service
 Production Branch: master
 Sub-repo: keyloop-technical-assessment-scenario-a-backend (single repository; every path below is relative to its root)
 
-Contract sources: `docs/design.md`, `docs/adr/ADR-001.md` to `ADR-013.md`. This SPEC is the ticket breakdown: one task per commit series, every commit traceable to a task and to a design section or ADR. Reader: an engineer reviewing or implementing. Code appears only where correctness is subtle (DDL, the booking transaction, the reserve adapter, the concurrency test); everything else is interface, rule and sequence.
+Contract sources: `docs/design.md`, `docs/adr/ADR-001.md` to `ADR-014.md` (ADR-014 from D-058). This SPEC is the ticket breakdown: one task per commit series, every commit traceable to a task and to a design section or ADR. Reader: an engineer reviewing or implementing. Code appears only where correctness is subtle (DDL, the booking transaction, the reserve adapter, the concurrency test); everything else is interface, rule and sequence.
 
 ## § Contract
 
@@ -168,7 +168,7 @@ Error body, every non-2xx: `{"code": "<code>", "message": "<text>", "errors": [.
 | Code | Status | Final | Stored |
 |---|---|---|---|
 | `confirmed` | 201 | yes | yes |
-| `validation` (schema, before BEGIN) | 400 malformed JSON or key; 422 schema | yes | no |
+| `validation` (schema, before BEGIN) | 400 malformed JSON or key; 413 body over 16 KiB (AC-17, D-058); 422 schema | yes | no |
 | `not_found` | 404 | yes | no |
 | `validation` (business, after claim) | 422 | yes | yes |
 | `replay_conflict` | 422 | yes | no (the original row stays) |
@@ -199,7 +199,7 @@ Wide event, one JSON line on stdout per request, keys in this order: `v, ts, req
 - AC-01 Schema: `alembic upgrade head` on an empty database creates every table of the ERD, extension `btree_gist`, constraints `no_bay_overlap`, `no_technician_overlap`, `no_vehicle_overlap`, `bay_in_dealership`, `technician_in_dealership`, `valid_range`, `positive_duration`, `same_day_hours`, `weekday_range`, and runs `GRANT SET ON PARAMETER deadlock_timeout`; the seed loads two dealerships and three service types including one of 4,320 minutes.
 - AC-02 Booking: a valid request returns 201 with the body above, `end_at = start_at + duration` in UTC, `pickup_from` derived; the row holds the snapshot and `vehicle_key`.
 - AC-03 409 codes: `capacity_exhausted` when the pruned list is empty (final, stored); `vehicle_already_booked` on `no_vehicle_overlap` (final, stored); `contention` when the bound of 5 is hit with candidates left (transient, claim discarded, `Retry-After: 1`).
-- AC-04 Idempotency boundary: every row of the ADR-008 table holds: 400 for malformed JSON or a non-UUID key, 404 unknown dealership, schema 422 never stored; business 422, 201 and final 409 stored and replayed; same key different body → 422 `replay_conflict`; concurrent same key → one appointment, identical answers.
+- AC-04 Idempotency boundary: every row of the ADR-008 table holds: 400 for malformed JSON or a non-UUID key, 413 for a body over the cap (AC-17, D-058), 404 unknown dealership, schema 422 never stored; business 422, 201 and final 409 stored and replayed; same key different body → 422 `replay_conflict`; concurrent same key → one appointment, identical answers.
 - AC-05 Time: start outside hours, in the past, beyond 90 days, or in a DST gap → 422 stored; a repeated local time takes the first occurrence; a 4,320-minute service from Fri 2027-03-26 09:00 London ends 2027-03-29T09:00:00Z; `pickup_from` equals `end_at` when inside hours, else the next opening instant, skipping closed days.
 - AC-06 Availability: the ADR-010 worked example returns exactly Friday `[09:00Z, 11:00Z]` and Monday `[13:00Z, 16:59Z]` for the one pair; windows over 14 days or outside the horizon → 422; response carries `as_of`.
 - AC-07 Concurrency (V-002): 8 concurrent bookings of one slot at a dealership with 4 bays × 4 qualified technicians (test-owned fixture, D-044), the clients released together by a barrier before they send (D-049), yield exactly 4 × 201 and 4 × 409 `capacity_exhausted`, distinct bays and technicians among winners, 8 committed key rows, overlap count 0, whatever mix of 23P01 and 40P01 occurred.
@@ -212,6 +212,7 @@ Wide event, one JSON line on stdout per request, keys in this order: `v, ts, req
 - AC-14 Layers: `tests/test_architecture.py` passes: `domain` imports only the standard library and itself; `application` imports only `domain` and itself; `infrastructure` and `interfaces` never import each other; only `main` imports both.
 - AC-15 Use cases run without a database: `BookAppointment` is exercised end to end against in-memory fakes (claim, replay, validation, attempts, contention rollback), and the fakes implement the same Protocols as the PostgreSQL adapters (mypy checks structural conformance).
 - AC-16 Retry fallback (D-050): a writer that bypasses the dealership lock and takes a resource between the candidate read and the first INSERT costs the booking one attempt per lost resource; the booking lands on a remaining free pair (201) or ends with 409 `capacity_exhausted` when none remains; never a 5xx, never an overlap.
+- AC-17 Request bounds (D-058, ADR-014): a request body over `MAX_BODY_BYTES` (16 KiB) is 413 `validation` in the house error body, never stored; a free string over its `max_length` in `schemas.py` is a schema 422 with `errors`, never stored.
 
 ### Test Cases
 
@@ -258,6 +259,7 @@ Edge and regression first, happy path last. Layer in the fourth column.
 | TC-36 | `make lint` and `make test` green (manual, recorded) | AC-12 | — |
 | TC-37 | ADR-008 precedence: unknown dealership with a schema-invalid body (no identifier, unknown field) → 404 `not_found`, no key row; malformed JSON on an unknown dealership → 400; missing key on an unknown dealership → 400 | AC-04 | test_idempotency.py |
 | TC-38 | README inspection: `grep -c '^## API$\|^## Running the demo$\|^## Testing$' README.md` prints `3`; line 3 reads `Status: implemented; see Testing for the evidence.`; `git diff -U0 master -- README.md | grep '^@@'` lists hunks only at line 3 and inside the three sections (recorded in the status file with the hunk list) | AC-13 | README.md |
+| TC-40 | Request bounds (D-058): oversized body is 413; an over-long string is 422 with the house error body. A body of `MAX_BODY_BYTES + 1` bytes with a valid key → 413 `{"code": "validation", "message": "request body exceeds 16384 bytes"}`, no key row; `customer.name` of 201 characters → 422 `validation` with one `errors` item, `loc` `["customer", "name"]`, `type` `string_too_long`, no key row | AC-17 | test_booking_api.py (interfaces) |
 
 ### Propagation and Rollback
 
@@ -297,6 +299,7 @@ Commit protocol (D-040): one task is one or more commits; each commit reviewable
 | AC-14 | TC-14 | T1 | `uv run pytest tests/test_architecture.py -q` |
 | AC-15 | TC-09, 10, 11 | T6 | `uv run pytest tests/test_book_appointment_usecase.py -q` |
 | AC-16 | TC-39 | T11 | `uv run pytest tests/test_concurrency.py -q -s` |
+| AC-17 | TC-40 | T20 | `uv run pytest tests/test_booking_api.py -q` |
 
 ### Interfaces
 
@@ -529,7 +532,7 @@ Other adapter rules: `claim` is `INSERT ... ON CONFLICT DO NOTHING RETURNING key
 - `schemas.py`: pydantic `BookingRequest` (`extra="forbid"`; `start_at` naive and whole minutes; `Customer` id or email; `Vehicle` id or vin, vin through `domain.canonical.normalise_vin`), `AppointmentOut`, `AvailabilityOut` (`from`/`to` aliases), `Window`, `ErrorOut`; `to_command(req, dealership_id, key) -> BookingCommand` is the one mapping function (accepted duplication, D-041).
 - `errors.py`: `STATUS_OF_CODE` table (Wire formats); handlers for `DomainError` subclasses, `pydantic.ValidationError` (422, `errors` from `.errors()` with `input` and `url` stripped), `json.JSONDecodeError` (400) and FastAPI's `RequestValidationError` (query and path errors, 422); a missing or non-UUID `Idempotency-Key` → 400 `validation`.
 - `dependencies.py`: `idempotency_key(request) -> UUID` (header dependency, 400 `validation` when missing or not a UUID); `UseCases` frozen dataclass (`reads`, `book_appointment`, `get_appointment`, `get_availability: GetAvailability | None = None` until T10b). The container is never stored on `app.state` (Known Facts 3): each router module exposes `build_router(uc: UseCases) -> APIRouter` and the handlers close over `uc`; `create_app` builds the container once and calls the factories.
-- `appointments.py`: `POST` declares no typed body parameter (so FastAPI performs no body validation of its own; `openapi_extra` carries `BookingRequest.model_json_schema()` for `/docs`). Handler order, ADR-008 steps 1–4: `raw = await request.json()` (`JSONDecodeError` → 400 `validation`, `json_invalid`); `dealership = await uc.reads.dealership(dealership_id)` (`None` → 404 `not_found`); `req = BookingRequest.model_validate(raw)` (`pydantic.ValidationError` → 422 `validation` through the handler in `errors.py`); `cmd = to_command(req, dealership_id, key)`. It then sets `ev.route = "book_appointment"`, calls `BookAppointment.execute(cmd, dealership)`, copies `Outcome` fields into the event, answers `STATUS_OF_CODE[outcome.code]` with `Retry-After: 1` on `contention`; `GET` calls `GetAppointment`.
+- `appointments.py`: `POST` declares no typed body parameter (so FastAPI performs no body validation of its own; `openapi_extra` carries `BookingRequest.model_json_schema()` for `/docs`). Handler order, ADR-008 steps 1–4: `raw = await request.json()` (`JSONDecodeError` → 400 `validation`, `json_invalid`; `BodyTooLarge` from `limits.py` → 413 `validation` when the body exceeds 16 KiB, D-058); `dealership = await uc.reads.dealership(dealership_id)` (`None` → 404 `not_found`); `req = BookingRequest.model_validate(raw)` (`pydantic.ValidationError` → 422 `validation` through the handler in `errors.py`); `cmd = to_command(req, dealership_id, key)`. It then sets `ev.route = "book_appointment"`, calls `BookAppointment.execute(cmd, dealership)`, copies `Outcome` fields into the event, answers `STATUS_OF_CODE[outcome.code]` with `Retry-After: 1` on `contention`; `GET` calls `GetAppointment`.
 - `availability.py`: `GET` with `from`/`to` query aliases, calls `GetAvailability`.
 
 The booking handler, given in full because the ADR-008 order is the subtle part (`interfaces/http/appointments.py`):
@@ -847,6 +850,11 @@ Paths: `.github/workflows/ci.yml` (remove the postgres service and `DATABASE_URL
 "API": the five endpoints, the `Idempotency-Key` rule, the request and 201 example, the error body and the code table, Swagger at `/docs`. "Running the demo": `make demo`, the eight sections, last line `0`, clean rerun. "Testing": `make test` (Docker required), one line per test file and what it proves, the race test alone with output, the L-001 rule, "Known limitations": no request-level deadline; `statement_timeout` is per statement; a vehicle by VIN once and by id once yields two keys; hours and seed change by migration; the compose role is a superuser so the GRANT is documentary; no key cleanup job (SQL given).
 Done when: `make lint && make test` green; the local CI equivalent recorded in the status file (`uv run pre-commit run --all-files`, `uv run mypy src`, `uv run pytest -q`, and `.github/workflows/ci.yml` inspected to run exactly those); GitHub CI runs after the push is authorised (D-045); TC-38's three commands recorded in the status file; status file at `Status: awaiting-audit`. Commit: `SPEC-001 T13: CI on testcontainers, README API, demo and testing sections (design §3, §5)`.
 
+**T20: Security posture and request bounds** (design §7, ADR-014, D-058)
+Paths: `src/scheduler/interfaces/http/limits.py` (new: `BodySizeLimitMiddleware`, `MAX_BODY_BYTES`, `BodyTooLarge`), `errors.py` (413 handler), `schemas.py` (`max_length` on every free string), `main.py` (mount inside the wide-event middleware), `appointments.py` (413 in the OpenAPI responses), `tests/test_booking_api.py` (TC-40 only), `docs/adr/ADR-014.md`, `docs/adr/README.md`, `docs/design.md`, `README.md`.
+The cap wraps `receive`: a declared `Content-Length` over the cap, or more bytes received than the cap, raises `BodyTooLarge` when the handler reads the body (ADR-008 step 1), so the 413 carries the route's wide event and never reaches the key store. HTTP layer only; no domain or application change.
+Done when: TC-40 passes; `uv run pre-commit run --files <changed>`, `uv run mypy src`, `uv run pytest -q` green. Commits: `SPEC-001 T20: <what> (design §7, ADR-014)`.
+
 ### Scope Amendments
 
 | Date | Approved by | Change | Reason |
@@ -859,3 +867,7 @@ Done when: `make lint && make test` green; the local CI equivalent recorded in t
 | 2026-11-05 | JP (D-050) | AC-16, TC-39 added to T11: retry-fallback test where a writer bypasses the dealership lock from the attempt gate; the `AttemptGate` seam stays for this purpose. TC-31 `attempts` sum becomes `== 4` with zero attempts per loser (D-048 audit cycle 3 F-001, Execution) | Under D-048 the retry loop fires only for writers around the lock; the fallback needs evidence, and the old `>= 8` was unimplementable |
 | 2026-11-05 | orchestrator (Execution, T14) | TC-39 row names the bypass bay and dealership of each case (bay 100 at dealership 100, bay 110 at dealership 110, as `tests/test_concurrency.py` uses); AC-16 listed after AC-15, numbering unchanged | Final coverage pass: the row said bay 100 for case (b) |
 | 2026-11-05 | orchestrator (Execution, T15) | Docs only: every ADR, design.md and README walked claim by claim against the code and tests; Codex F-1..F-12 on ADR-004 fixed in the body (latency budget an SLO allocation, not enforced; `SELECT ... FOR UPDATE` rejected, not implemented; retry-fallback claims scoped to what TC-39 proves; pool limit a hypothesis); no decision, code or test changed | JP: one coherent body before the videos |
+| 2026-11-05 | JP (D-058) | AC-17, TC-40 and task T20 added: request body cap (413) and `max_length` on every free string (schema 422); security posture recorded as ADR-014 and design §7 | Security was the unstated gap: the trust boundary was implied by "Authentication: upstream gateway" only |
+| 2026-11-05 | orchestrator (Execution, T20) | AC-04 and the HTTP layer handler order name the 413 of AC-17 | Codex T20 cycle 1: the ADR-008 row and the handler sequence omitted the 413 |
+| 2026-11-05 | orchestrator (Execution, T20) | Contract sources extend to ADR-014; T20 paths gain `appointments.py` (413 listed in the booking route's OpenAPI responses) | Codex T20 cycle 2: sources ended at ADR-013; `/openapi.json` omitted the 413 |
+| 2026-11-05 | orchestrator (Execution, T20) | Wire-format code table names the 413; TC-40's "no key row" checks the row count | Codex T20 cycle 3 (fixed after the cap, not re-verified) |

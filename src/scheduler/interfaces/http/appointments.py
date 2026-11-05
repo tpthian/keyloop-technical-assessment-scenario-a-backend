@@ -27,7 +27,7 @@ BOOKING_BODY: dict[str, Any] = {
 }
 BOOKING_RESPONSES: dict[int | str, dict[str, Any]] = {
     201: {"model": AppointmentOut},
-    **{status: {"model": ErrorOut} for status in (400, 404, 409, 422)},
+    **{status: {"model": ErrorOut} for status in (400, 404, 409, 413, 422)},
 }
 OUTCOME_FIELDS = (
     "code",

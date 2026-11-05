@@ -2,7 +2,8 @@
 ``scheduler.infrastructure`` and ``scheduler.interfaces``.
 
 ``create_app`` builds the adapters, injects them into the use cases, hands one ``UseCases``
-container to each router factory and mounts the wide-event middleware and the error handlers.
+container to each router factory and mounts the wide-event and body-cap middleware and the error
+handlers.
 Nothing but the engine goes on ``app.state`` (readiness only, Known Facts 3). ``uvicorn
 scheduler.main:create_app --factory`` calls it with no arguments: the engine then comes from
 ``DATABASE_URL`` and is disposed when the app shuts down; an engine passed in belongs to the
@@ -29,6 +30,7 @@ from scheduler.interfaces.http import appointments, availability, health
 from scheduler.interfaces.http.dependencies import UseCases
 from scheduler.interfaces.http.errors import register_handlers
 from scheduler.interfaces.http.events import WideEventMiddleware
+from scheduler.interfaces.http.limits import BodySizeLimitMiddleware
 from scheduler.settings import get_settings
 
 
@@ -66,6 +68,7 @@ def create_app(
     app.include_router(appointments.build_router(uc))
     app.include_router(availability.build_router(uc))
     app.include_router(health.build_router(db))
+    app.add_middleware(BodySizeLimitMiddleware)  # inside the wide event: a 413 is logged (ADR-014)
     app.add_middleware(WideEventMiddleware)
     register_handlers(app)
     return app

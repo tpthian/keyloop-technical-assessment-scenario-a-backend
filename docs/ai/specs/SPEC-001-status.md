@@ -137,3 +137,12 @@ Ledger: walk OK 158, STALE 12, UNPROVEN 17, CONTRADICTS 7, DANGLING 1 (every ADR
 Cross-check: docs/ai/reviews/SPEC-001-adr-coherence-crosscheck.md, Codex, 3 cycles then a narrow re-check of F-14 (fixed in 6b72d6d): final verdict approve.
 Needs the author: 3, all resolved in T16 (`serialise` docstring qualified to writers that honour the lock; `test_architecture.py` docstring cites design §2; the design §2 layer line kept, closing the D-038 open item).
 Gates: `uv run pytest -q` 109 passed; `uv run mypy src tests/fakes.py` clean; `uv run pre-commit run --all-files` clean.
+
+## T20 (security posture and request bounds, D-058)
+
+Status: audited. Codex 3 cycles (8, 4, 4 findings, all fixed), then a narrow read-only re-check of the last fix commit ac9c619 (D-052): approve.
+Commits on leg/t20-security (BASE f79be29): 84f6f7c (body cap 413, `max_length` on every free string, TC-40, SPEC AC-17/TC-40/T20/amendment), 35007fe (ADR-014, ADR index row, design §7 and TL;DR row, 413 in ADR-008 and the ADR-013 SLI), 023385b (README), c20d9c2 (cycle 1 fixes), d87c51f (cycle 2 fixes), ac9c619 (cycle 3 fixes, unverified by Codex), and this status commit with the audit.
+Gates on ac9c619: `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock uv run pytest -q` → 110 passed; `uv run mypy src` → no issues in 34 source files; `uv run pre-commit run --all-files` → all hooks passed.
+Cross-check: docs/ai/reviews/SPEC-001-T20-audit.md, Codex read-only, 3 cycles: revise (8 findings), revise (4), revise (4); all 16 fixed. Cycle 3 findings fixed after the cap in ac9c619, not re-verified.
+Deviations: the TC list sits in § Contract, so TC-40 and AC-17 are Contract additions under D-058; `appointments.py` lists 413 in the OpenAPI responses (cycle 2, documentation of the response, no behaviour change); consistency rows added outside the named files: ADR-008 boundary table, ADR-013 SLI and null-counter list, SPEC wire-format table and HTTP-layer handler order, README pre-transaction list and test table; README narrative counts updated to 17 AC, 40 TC, 110 tests (cycle 1).
+Open for the author: the README narrative's "43 audit and review runs" and "56 decisions" predate T20 (3 more Codex runs; D-058); the production `/docs` setting and tenant binding are deferred in ADR-014.
