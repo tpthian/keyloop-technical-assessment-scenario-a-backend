@@ -168,7 +168,7 @@ Error body, every non-2xx: `{"code": "<code>", "message": "<text>", "errors": [.
 | Code | Status | Final | Stored |
 |---|---|---|---|
 | `confirmed` | 201 | yes | yes |
-| `validation` (schema, before BEGIN) | 400 malformed JSON or key; 422 schema | yes | no |
+| `validation` (schema, before BEGIN) | 400 malformed JSON or key; 413 body over 16 KiB (AC-17, D-058); 422 schema | yes | no |
 | `not_found` | 404 | yes | no |
 | `validation` (business, after claim) | 422 | yes | yes |
 | `replay_conflict` | 422 | yes | no (the original row stays) |
@@ -870,3 +870,4 @@ Done when: TC-40 passes; `uv run pre-commit run --files <changed>`, `uv run mypy
 | 2026-11-05 | JP (D-058) | AC-17, TC-40 and task T20 added: request body cap (413) and `max_length` on every free string (schema 422); security posture recorded as ADR-014 and design §7 | Security was the unstated gap: the trust boundary was implied by "Authentication: upstream gateway" only |
 | 2026-11-05 | orchestrator (Execution, T20) | AC-04 and the HTTP layer handler order name the 413 of AC-17 | Codex T20 cycle 1: the ADR-008 row and the handler sequence omitted the 413 |
 | 2026-11-05 | orchestrator (Execution, T20) | Contract sources extend to ADR-014; T20 paths gain `appointments.py` (413 listed in the booking route's OpenAPI responses) | Codex T20 cycle 2: sources ended at ADR-013; `/openapi.json` omitted the 413 |
+| 2026-11-05 | orchestrator (Execution, T20) | Wire-format code table names the 413; TC-40's "no key row" checks the row count | Codex T20 cycle 3 (fixed after the cap, not re-verified) |

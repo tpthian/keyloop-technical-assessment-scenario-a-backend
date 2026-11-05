@@ -248,6 +248,14 @@ async def test_back_to_back_on_one_pair_both_201(
 # TC-40: request bounds (ADR-014, D-058).
 
 
+async def _key_row_count(engine: AsyncEngine, key: str) -> int:
+    async with engine.connect() as conn:
+        result = await conn.execute(
+            text("SELECT count(*) FROM idempotency_key WHERE key = :k"), {"k": key}
+        )
+        return int(result.scalar_one())
+
+
 async def test_oversized_body_is_413_and_over_long_string_is_422(
     client: httpx.AsyncClient, engine: AsyncEngine
 ) -> None:
@@ -264,7 +272,7 @@ async def test_oversized_body_is_413_and_over_long_string_is_422(
         "code": "validation",
         "message": f"request body exceeds {MAX_BODY_BYTES} bytes",
     }
-    assert await _stored_code(engine, key) is None
+    assert await _key_row_count(engine, key) == 0
 
     key = str(uuid4())
     response = await _book(client, booking_body(name="x" * 201), key)
@@ -278,7 +286,7 @@ async def test_oversized_body_is_413_and_over_long_string_is_422(
             "type": "string_too_long",
         }
     ]
-    assert await _stored_code(engine, key) is None
+    assert await _key_row_count(engine, key) == 0
 
 
 # TC-27: happy path.

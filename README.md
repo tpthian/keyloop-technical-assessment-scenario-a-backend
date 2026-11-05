@@ -59,7 +59,7 @@ Swagger UI at `http://localhost:8000/docs` when the service runs (`make run` or 
 `Idempotency-Key` rule:
 
 - The header is a UUID; missing or not a UUID is 400 `validation`. Keys are scoped to the dealership.
-- Malformed JSON (400), unknown dealership (404) and schema errors (422 with `errors`) are answered before the transaction and never stored, so a corrected body may reuse the key.
+- Malformed JSON (400), a body over 16 KiB (413, ADR-014), unknown dealership (404) and schema errors (422 with `errors`) are answered before the transaction and never stored, so a corrected body may reuse the key.
 - 201, business 422 and the final 409s (`capacity_exhausted`, `vehicle_already_booked`) are stored with the key and replayed with the same status and body for the same key and body, until cleanup and at least 24 h.
 - The same key with a different body is 422 `replay_conflict`; the original outcome stays.
 - `contention` (409, `Retry-After: 1`) and 500 discard the claim, so a retry with the same key runs again.
