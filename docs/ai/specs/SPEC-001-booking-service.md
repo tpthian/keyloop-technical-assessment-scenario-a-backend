@@ -359,7 +359,8 @@ class UnitOfWork(Protocol):
     reads: SchedulingReadRepository  # same connection, for in-transaction reference reads
 
     # transaction-scoped advisory lock (pg_advisory_xact_lock): bookings of one dealership run
-    # one at a time; no lock cycles, so no 40P01 under contention (ADR-004 amendment, D-048)
+    # one at a time; between writers that honour it no lock cycles form, so no 40P01 under
+    # contention (ADR-004 amendment, D-048); a writer outside it meets the retry fallback (D-050)
     async def serialise(self, dealership_id: int) -> None: ...
 
     async def __aenter__(self) -> "UnitOfWork": ...
