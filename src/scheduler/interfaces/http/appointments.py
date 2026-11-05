@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from pydantic import ValidationError
 
 from scheduler.domain.errors import NotFound
@@ -56,7 +56,15 @@ def build_router(uc: UseCases) -> APIRouter:
         request: Request,
         response: Response,
         key: Annotated[UUID, Depends(idempotency_key)],  # ADR-008 step 1: header first
+        idempotency_key_header: Annotated[
+            str | None,
+            Header(
+                alias="Idempotency-Key",
+                description="Client UUID; the same key replays the stored response (ADR-008)",
+            ),
+        ] = None,  # declared for the OpenAPI contract and Swagger UI only; `key` enforces it
     ) -> dict[str, Any]:
+        del idempotency_key_header
         return await _book(uc, dealership_id, request, response, key)
 
     @router.get(
