@@ -128,12 +128,12 @@ Demo: `make down && make demo` run twice (before and after the banner fix): sect
 README run as a reviewer: `make install`, `make up`, `make migrate`, `make run`, the booking curl (201 on a fresh database; 409 `vehicle_already_booked` when sent again or after `make demo`, now stated), `GET` by id 200, availability 200, `/health/live` 200, `/health/ready` 200, `/docs` 200, `/openapi.json` 5 paths, error bodies 400, 404, 422 with `errors`.
 Coverage against the brief: 41 rows; 34 MET, 3 PARTIAL, 1 MISSING, 3 out of scope by design. The PARTIAL and MISSING rows reduce to two author-owned items (D-038): the README AI Collaboration Narrative and the video link.
 Audit: docs/ai/reviews/SPEC-001-T14-audit.md — pass (cycle 1); every MET row cross-checked, no missed requirement.
-Open for the author: README AI Collaboration Narrative and the Deliverables map rows for it and the video; design.md section 2 layer line (D-038); push and GitHub CI (D-045).
+Open for the author: README AI Collaboration Narrative and the Deliverables map rows for it and the video; push and GitHub CI (D-045).
 
 ## T15
 
 ADR coherence walk, docs only, from e659eaf. Commits: 033f657 (C1, Codex F-1..F-12 on ADR-004), 077a6d1 (C2), e2d099b (C3), c13951f (C4, with the SPEC T15 amendment row), 4ecb8f0 (cycle 1), b69d8ad (cycle 2), 6b72d6d (fix after cycle 3).
 Ledger: walk OK 158, STALE 12, UNPROVEN 17, CONTRADICTS 7, DANGLING 1 (every ADR, design.md, README.md, adr/README); cross-check adds STALE 4, UNPROVEN 3, CONTRADICTS 1, DANGLING 2. Fixes: 51.
 Cross-check: docs/ai/reviews/SPEC-001-adr-coherence-crosscheck.md, Codex, 3 cycles then a narrow re-check of F-14 (fixed in 6b72d6d): final verdict approve.
-Needs the author: 3 (code comment `ports.py:91` and test docstring `test_architecture.py:1` out of the docs-only scope; the design §2 layer line added in cycle 1 was an author-owned open item, keep or revert).
+Needs the author: 3, all resolved in T16 (`serialise` docstring qualified to writers that honour the lock; `test_architecture.py` docstring cites design §2; the design §2 layer line kept, closing the D-038 open item).
 Gates: `uv run pytest -q` 109 passed; `uv run mypy src tests/fakes.py` clean; `uv run pre-commit run --all-files` clean.

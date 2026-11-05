@@ -89,8 +89,9 @@ class UnitOfWork(Protocol):
         """Transaction-scoped advisory lock, so bookings of one dealership run one at a time.
 
         Held until COMMIT or ROLLBACK. Every booking of a dealership takes the same single lock
-        before its first attempt, so attempts form no lock cycles and no 40P01 arises under
-        contention (ADR-004 amendment, D-048).
+        before its first attempt, so attempts between writers that honour it form no lock cycles
+        and raise no 40P01 (ADR-004 amendment, D-048); a writer outside it meets the retry
+        fallback (D-050).
         """
         ...
 

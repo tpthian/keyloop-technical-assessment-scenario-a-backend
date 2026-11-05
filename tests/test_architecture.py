@@ -1,4 +1,4 @@
-"""AC-14 / TC-14: the layer dependency rule of design §4 (D-041), enforced on every commit.
+"""AC-14 / TC-14: the layer dependency rule of design §2 (D-041), enforced on every commit.
 
 domain -> standard library only; application -> domain; infrastructure -> application + domain;
 interfaces -> application + domain; only ``scheduler.main`` may import both infrastructure and
