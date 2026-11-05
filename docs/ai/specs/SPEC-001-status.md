@@ -137,3 +137,10 @@ Ledger: walk OK 158, STALE 12, UNPROVEN 17, CONTRADICTS 7, DANGLING 1 (every ADR
 Cross-check: docs/ai/reviews/SPEC-001-adr-coherence-crosscheck.md, Codex, 3 cycles then a narrow re-check of F-14 (fixed in 6b72d6d): final verdict approve.
 Needs the author: 3, all resolved in T16 (`serialise` docstring qualified to writers that honour the lock; `test_architecture.py` docstring cites design §2; the design §2 layer line kept, closing the D-038 open item).
 Gates: `uv run pytest -q` 109 passed; `uv run mypy src tests/fakes.py` clean; `uv run pre-commit run --all-files` clean.
+
+## T21
+
+Decision register, docs only, from f79be29. Commits: 99e83cc (`docs/decisions.md`: one row per D-nnn id the repository cites, 36 ids, plus D-058 and D-059; pointers in `docs/ai/README.md` pipeline step 3, `docs/adr/README.md`, README deliverables map), 68ac7f6 (cycle 1 fixes), 15ee258 and 544f7f5 (cycle 2 fixes), and this status commit with the audit.
+Cross-check: docs/ai/reviews/SPEC-001-T21-audit.md, Codex, 3 cycles: revise (9), revise (7), approve.
+Gates: `uv run pre-commit run --files` on every changed file green at each commit.
+Deviations: the D-058 row points at ADR-014 and design.md §7, which land with T20; at this commit the link does not resolve. Citing passages are not changed: `docs/adr/ADR-004.md:17` and `docs/adr/ADR-007.md:11` cite D-036 for rules its row does not cover, and `docs/ai/specs/SPEC-001-booking-service.md:38` cites D-012 for out-of-scope items; reported to the author.
