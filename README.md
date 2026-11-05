@@ -2,6 +2,8 @@
 
 Status: implemented; see Testing for the evidence.
 
+Video (Part 3): [Google Drive folder](https://drive.google.com/drive/folders/1kLya8PxK1E9R5nCXu5qOebYBWKtcRmdC?usp=sharing) (primary, downloadable) or [Loom](https://www.loom.com/share/b54c43b06ce842d0bebbb6c353635e28) (streaming).
+
 ## Quick start
 
 Requires Docker (with Compose), [uv](https://docs.astral.sh/uv/) and `make`; uv installs Python 3.12 and the dependencies. The demo also needs `curl`, `jq` and `python3` on the host.
@@ -32,7 +34,7 @@ Where each item the brief asks for lives in this repository.
 | Part 2: README, build, run, test | How to build, run and test | This file: Quick start, Running the demo, Testing |
 | Part 2: AI Collaboration Narrative | How AI was used in implementation, how its output was verified, what it got wrong | This file, section "AI Collaboration Narrative", in the author's voice; the evidence is in [docs/ai/](docs/ai/README.md) and [docs/ai/defects-caught.md](docs/ai/defects-caught.md) |
 | Part 2: Tests validating core logic | Tests for the booking guarantee, retry, idempotency, time rules | `tests/`, run with `make test` |
-| Part 3: Video | 5 to 10 minute walkthrough | Link in the submission email and at the top of this file once recorded |
+| Part 3: Video | 5 to 10 minute walkthrough | Links at the top of this file: Google Drive (primary) and Loom; also in the submission email |
 
 ## System design
 
