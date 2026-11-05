@@ -1,4 +1,6 @@
-# Defects caught before code
+# Defects caught
+
+## Before code
 
 Each row is a defect found in the design phase, before any application code existed, with what it changed.
 
@@ -12,3 +14,13 @@ Each row is a defect found in the design phase, before any application code exis
 | Vehicle identity: a vehicle sent by `id` without a VIN escaped `no_vehicle_overlap`, and ADR-008 omitted `vehicle_already_booked` | AI second-model review | `docs/ai/reviews/review-002.md` (M2) | NOT NULL `vehicle_key`; constraint with no WHERE clause; final 409 `vehicle_already_booked` recorded and replayed |
 | SLO not computable: the event's `outcome` could not tell a final 409 from a transient one, and booking-only fields were undefined on other routes | AI second-model review | `docs/ai/reviews/review-002.md` (M3); ADR-013 | Event gains `route`, `code`, `final`; SLI scoped to booking; every status classified |
 | Latency versus deadlock timeout: five attempts at the default 1 s `deadlock_timeout` contradicted the 1,000 ms bound and the "immediate answer" wording | AI second-model review | `docs/ai/reviews/review-002.md` (M4); ADR-004 "Latency budget" | `SET LOCAL deadlock_timeout = '100ms'`, `statement_timeout` 2 s; latency budget table; a recovered race is good only inside the bound |
+
+## In the implementation phase, caught by the author
+
+Each row is a defect that passed the AI gates and was found by the author reading the output.
+
+| Defect | Caught by | Evidence path | Consequence |
+|---|---|---|---|
+| Sizing written as given: design.md and ADR-004 stated 1,000 sites as if the brief had supplied it; the brief gives no count | Author, asking whether a service business has 1,000 sites; it had passed the adversarial review of the design | design.md section 4 and ADR-004 "Scale" (both now say "assumption") | Every number in the repository names its origin: the brief, a measurement, or an assumption |
+| Amendment by annotation: the ADR-004 amendment for the per-dealership lock was appended while the latency table and four body passages still described deadlock-and-retry as the normal path; it passed eight audit cycles across four gates (the amendment audit, the coherence cross-check, the final gate and the T14 audit) | Author, reading one table: "has this been validated?" | `docs/ai/reviews/SPEC-001-adr-coherence-crosscheck.md`; ADR-004 | ADR-004 body rewritten; then a claim-by-claim walk of every ADR against the code: 51 corrections, cross-examined by the second model (L-005) |
+| Latency budget failed by a correct design: the race test held the exact 4/4 split in 9 of 20 runs with deadlocks between writers and peaks of 1.2 to 1.4 s; the implementer proposed relaxing the test | Author, ruling on the implementer's escalation | `docs/ai/reviews/SPEC-001-D048-audit.md`; ADR-004 amendment; `docs/ai/specs/SPEC-001-status.md` | Test kept exact; per-dealership advisory lock after the key claim, retry kept as the fallback; 19 of 19 runs, zero deadlocks |

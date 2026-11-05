@@ -69,10 +69,10 @@ Defects caught before code, with what each changed: [defects-caught.md](defects-
 | Adversarial review | [reviews/review-001.md](reviews/review-001.md) | Design |
 | Second-model review | [reviews/review-002.md](reviews/review-002.md) | Design |
 | Verification ledger | [verification-ledger.md](verification-ledger.md) | Design, continued in implementation |
-| Defects caught before code | [defects-caught.md](defects-caught.md) | Design |
+| Defects caught | [defects-caught.md](defects-caught.md) | Design, continued in implementation |
 | SPEC (contract and execution plan per task) | [specs/SPEC-001-booking-service.md](specs/SPEC-001-booking-service.md); per-task status, gates and deviations in [specs/SPEC-001-status.md](specs/SPEC-001-status.md) | Implementation |
 | SPEC review (second model) | [reviews/SPEC-001-spec-review.md](reviews/SPEC-001-spec-review.md) | Implementation |
 | Code audit against the SPEC | Whole SPEC: [reviews/SPEC-001-code-audit.md](reviews/SPEC-001-code-audit.md); one audit per task series: `reviews/SPEC-001-T<n>-audit.md` | Implementation |
-| AI Collaboration Narrative | `README.md` at the repository root, written in the implementation phase | Implementation |
+| AI Collaboration Narrative | `README.md` at the repository root, section "AI Collaboration Narrative", in the author's voice | Implementation |
 
-Implementation-phase roles: spec author (Claude), spec reviewer (Codex), implementation agent, code auditor (Claude), each a separate agent with its own artefact here.
+Implementation-phase roles: spec author (Claude), spec reviewer (Codex), implementation agent, code auditor (Codex, read-only), each a separate agent with its own artefact here.

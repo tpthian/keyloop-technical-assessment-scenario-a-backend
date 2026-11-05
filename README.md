@@ -30,7 +30,7 @@ Where each item the brief asks for lives in this repository.
 | Part 1, supporting: GenAI in the design phase | Pipeline, gates, reviews, verification ledger, defects caught | [docs/ai/README.md](docs/ai/README.md), [docs/ai/verification-ledger.md](docs/ai/verification-ledger.md), [docs/ai/defects-caught.md](docs/ai/defects-caught.md), [docs/ai/reviews/](docs/ai/reviews/review-001.md) |
 | Part 2: Backend, API and data layer | Appointment booking API, availability check with no double booking under concurrency, multi-tenant data model | `src/scheduler/`, `migrations/`; API table in design.md section 3; Swagger UI at `/docs` when running |
 | Part 2: README, build, run, test | How to build, run and test | This file: Quick start, Running the demo, Testing |
-| Part 2: AI Collaboration Narrative | How AI was used in implementation, how its output was verified, what it got wrong | This file, section "AI Collaboration Narrative" (written in the implementation phase), with the evidence in [docs/ai/](docs/ai/README.md) |
+| Part 2: AI Collaboration Narrative | How AI was used in implementation, how its output was verified, what it got wrong | This file, section "AI Collaboration Narrative", in the author's voice; the evidence is in [docs/ai/](docs/ai/README.md) and [docs/ai/defects-caught.md](docs/ai/defects-caught.md) |
 | Part 2: Tests validating core logic | Tests for the booking guarantee, retry, idempotency, time rules | `tests/`, run with `make test` |
 | Part 3: Video | 5 to 10 minute walkthrough | Link in the submission email and at the top of this file once recorded |
 
@@ -191,7 +191,40 @@ Known limitations:
 
 ## AI Collaboration Narrative
 
-Written in the implementation phase. Design-phase procedure and evidence: [docs/ai/README.md](docs/ai/README.md).
+This section is written in the author's voice; the rest of the repository is written as an instruction book. Design-phase procedure and evidence: [docs/ai/README.md](docs/ai/README.md).
+
+**How I directed the work**
+
+- I owned the problem. I read the brief, chose the backend scenario, and cut it to the one hard thing: no double booking of a bay, a technician or a vehicle under concurrency. I wrote the service model on paper first: dealership, bays, technicians, appointments as time ranges.
+- The AI's job was to challenge that sketch, not to replace it. Every challenge had to carry a measurement or a source. I decided each item; every outcome is a numbered decision that names its origin: the brief, me, or AI-proposed and accepted by me. 56 decisions over three days.
+- My first answer to double booking was a queue or an application-level check. The AI countered with PostgreSQL exclusion constraints and I made it prove the claim before I adopted it: a spike against a real database. The first spike hid the problem by staggering clients 50 ms apart. The adversarial review of that spike reproduced deadlocks in 9 of 11 transactions. The second spike, eight simultaneous writers with a savepoint per attempt, recovered from both failure modes with zero overlaps. That is the design we built.
+- Architecture, layer rules and code principles were fixed before the first line of code, and a test enforces the layer rule on every commit.
+
+**The loop, once the design stood**
+
+- A SPEC in two parts: a Contract I gate, an Execution section the agents may revise. 16 acceptance criteria, 39 test cases.
+- An adversarial review of the SPEC by a second AI, three cycles, before I approved it.
+- Fifteen implementation tasks, each in an isolated branch, each followed by a read-only audit from the second AI. Tests are exactly the SPEC test cases; the auditor never writes tests. Cap of three audit cycles, then it stops and comes to me.
+- Nine of the fifteen passed first time, three took two cycles, two took three, one took four by my exception. 43 audit and review runs in total, every final verdict a pass. 109 tests.
+- Anything that touched the contract or the business logic came to me. I read, ruled, revised, and redesigned where the evidence demanded it.
+- After the code: two coherence walks of the design document and every ADR against the code, with the second AI cross-examining the walker, then a handful of small documentation commits under the gates alone. The documents describe the code that runs.
+
+**Where my judgement changed the outcome**
+
+- The race test proved correctness but failed the latency budget: the split held in 9 of 20 runs, deadlocks between writers, peaks of 1.2 to 1.4 seconds. The implementer offered to relax the test. I kept the test exact and ruled for a per-dealership advisory lock after the idempotency claim, with the retry kept as the fallback for writers outside the lock. Since then: 19 of 19 runs, zero deadlocks, about 110 to 150 ms.
+- An ADR had its change appended as an amendment while the body still described the old model. It passed eight AI audit cycles across four gates. I caught it from one table and asked "has this been validated?". That became a claim-by-claim walk of every ADR against the code: 51 corrections.
+- The AI once wrote a 1,000-site scale figure as if the brief had given it. I struck it. Numbers in this repository say where they come from.
+- The AI proposed a 90-day booking horizon the brief never asked for. I kept it, and made the ADR say what it is: an operational assumption standing in for published roster depth, with the rule that will replace it.
+
+**Rules that bounded the agents**
+
+- No agent pushes. Every commit names its task, design section and ADR. Merges are never squashed, so the audit trail is the history.
+- Every decision, defect and lesson is logged with who found it. The repository cites lessons by id; the raw record stays with me.
+- Evidence over narration. The verification ledger, the defects-caught register and the audit reports are in [docs/ai/](docs/ai/README.md), so the process is visible as a system rather than told as a story.
+
+**What I learned**
+
+- The AI's value was speed and breadth in measurement, implementation and audit, and a good counter-proposal when mine was weaker. Mine was knowing what the hard thing was, holding a test exact when it was inconvenient, reading the evidence, and spotting the one document that no audit re-read.
 
 ## Quality gates
 
