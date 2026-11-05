@@ -17,3 +17,4 @@ Each record is short and cites, as D-nnn, the entry of the working decision log 
 | [011](ADR-011.md) | Quality gates | Pre-commit plus CI, enforced by the repository. |
 | [012](ADR-012.md) | Scope and demonstration | No custom UI; Swagger UI, demo script, curl. |
 | [013](ADR-013.md) | Observability | One wide JSON event per request on stdout, schema v1; SLI over booking events; no metrics endpoint, no background audit; the overlap query runs in the concurrency test and `demo.sh`. |
+| [014](ADR-014.md) | Security posture and trust boundary | Three trust zones: the gateway (assumed) authenticates, rate-limits and caps volume; the service binds every SQL value, validates every body, caps the body at 16 KiB (413) and every free string, logs identifiers only and bounds the work per request; a future CRM stays outbound and off the booking path. Tenant binding of caller to dealership is the one stated gap, deferred. Not a penetration test. |

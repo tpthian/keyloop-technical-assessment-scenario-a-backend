@@ -14,6 +14,7 @@ The database is the referee. A booking request lists free (bay, qualified techni
 | 4. Technology | Python 3.12, FastAPI, psycopg 3, SQLAlchemy Core, Alembic, PostgreSQL 16 `btree_gist`; one primary, replicas for availability only, shard by dealership; 1,000 sites is an assumption | ADR-002, ADR-004 |
 | 5. Observability | One wide JSON event per request on stdout is the product; servers attach later | ADR-013 |
 | 6. GenAI | The author proposes, decides and overrides; AI challenges, drafts, reviews and verifies | [docs/ai/](ai/README.md) |
+| 7. Security | Three trust zones: gateway (assumed), this service, future CRM; one stated gap, tenant binding of caller to dealership | ADR-014 |
 
 ## 1. Architecture diagram
 
@@ -37,7 +38,7 @@ flowchart LR
 | Qualified | Holds every skill the service type requires; zero required skills means any technician; none qualified at the dealership is 422, not 409 (ADR-006) |
 | Duration, hours | On the service type; the server computes `end_at`. Start must fall in opening hours; services may span days (ADR-009) |
 | Customer and vehicle | Snapshot with an identifier: vehicle `id` or `vin`, customer `id` or `email` (ADR-007) |
-| Authentication | Upstream gateway; out of scope |
+| Authentication | Upstream gateway, assumed; the gateway contract and the trust boundary are in section 7 and ADR-014 |
 | Ranges | Half-open, no turnaround buffer (ADR-005) |
 | Limitations | No per-dealership service offering; bays and technicians are never retired |
 
@@ -144,7 +145,7 @@ sequenceDiagram
 
 | Endpoint | Responses |
 |---|---|
-| `POST /dealerships/{id}/appointments` | 201 with `pickup_from`; 409 `capacity_exhausted`, `vehicle_already_booked`, `contention`; 422; 400; 404 (ADR-008) |
+| `POST /dealerships/{id}/appointments` | 201 with `pickup_from`; 409 `capacity_exhausted`, `vehicle_already_booked`, `contention`; 422; 400; 413 (ADR-014); 404 (ADR-008) |
 | `GET /dealerships/{id}/availability?service_type_id&from&to` | 200 with `as_of`; 422; 404 |
 | `GET /dealerships/{id}/appointments/{appointment_id}` | 200; 404 |
 | `GET /health/live` | 200 while the process is up |
@@ -204,7 +205,7 @@ flowchart LR
 ```
 
 - Rule: every request writes one event with `route`, `code`, `final`, `attempts`, `deadlocks`, `idempotency_key` and `latency_ms` among its 17 fields; identifiers only, no email, VIN or `vehicle_key`. Schema table: [ADR-013](adr/ADR-013.md#event-schema-v1).
-- Rule: the SLI covers `book_appointment` only: good is a final outcome within 1,000 ms; `contention` and 5xx are bad; 400 and 404 are excluded; target 99.5 % over 30 days. Classification table: [ADR-013](adr/ADR-013.md#sli).
+- Rule: the SLI covers `book_appointment` only: good is a final outcome within 1,000 ms; `contention` and 5xx are bad; 400, 413 and 404 are excluded; target 99.5 % over 30 days. Classification table: [ADR-013](adr/ADR-013.md#sli).
 - Rule: no metrics endpoint and no background audit. The overlap query runs as an assertion in the concurrency test and as the last line of `demo.sh`.
 - Principles: percentiles, not averages; retries are normal, counted and capped, a lost resource is never tried again; the idempotency key is the end-to-end identifier; trust but verify; wide events, never pre-aggregated; high cardinality in events, not labels; transient and permanent failures classified.
 - Limitation: no history beyond container logs and no alerting until a store is attached.
@@ -223,3 +224,12 @@ flowchart LR
 - Overrides by the author: CRM off the booking path, end-before-close struck, observability as a strategy, the 1,000-site figure relabelled.
 - Defects caught before code: a vacuous pre-commit pass, a barrier stall in the spike, the savepoint gap, a 40P01 hidden by a staggered spike, and four review-002 gaps (idempotency boundary, vehicle identity, SLO computability, latency against deadlock timeout).
 - Roles, pipeline gates and decision ownership: [docs/ai/README.md](ai/README.md). Defects: [defects-caught.md](ai/defects-caught.md). Claims: [verification-ledger.md](ai/verification-ledger.md). Reviews: [review-001](ai/reviews/review-001.md), [review-002](ai/reviews/review-002.md).
+
+## 7. Security
+
+The brief states no security requirement; the service is one component behind a platform gateway. The posture is a trust boundary in three zones, not a penetration test. Full record, gateway contract and threat table: [ADR-014](adr/ADR-014.md).
+
+- Gateway, assumed, not in this repository: TLS, authentication, rate limits per caller and per dealership, a body size cap, WAF and volumetric protection.
+- This service: bound parameters on every SQL statement that carries request data; Pydantic validation of every body and path; a 16 KiB body cap (413) and a `max_length` on every free string (422); identifiers only in events (ADR-013); bounded work per request (14-day availability window, 5 attempts, 2 s `statement_timeout`, 90-day horizon); gitleaks, a pinned lockfile and CI on every push (ADR-011).
+- Future CRM: outbound only, allow-listed, credentials from the environment, timeouts and a circuit breaker, never on the booking path (ADR-007), so a compromised or slow CRM cannot block or corrupt a booking.
+- Gap, stated: tenant binding. Routes are scoped by the `dealership_id` in the path and the database refuses cross-dealership rows, but nothing ties the caller to that dealership. Closing it needs a trusted dealership claim from the gateway and a comparison in the HTTP layer, a Contract-level change; deferred, not forgotten.
