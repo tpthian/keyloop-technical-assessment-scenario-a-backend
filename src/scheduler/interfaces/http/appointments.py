@@ -19,10 +19,35 @@ from scheduler.interfaces.http.dependencies import UseCases, idempotency_key
 from scheduler.interfaces.http.errors import STATUS_OF_CODE
 from scheduler.interfaces.http.schemas import AppointmentOut, BookingRequest, ErrorOut, to_command
 
+
+def _inline_defs(schema: dict[str, Any]) -> dict[str, Any]:
+    """Replace every ``#/$defs/<name>`` reference with the definition itself.
+
+    ``openapi_extra`` places the schema inside ``requestBody``, where Swagger UI cannot resolve
+    Pydantic's ``$defs`` block; inlining keeps one self-contained schema in the contract.
+    """
+    defs: dict[str, Any] = schema.get("$defs", {})
+
+    def walk(node: Any) -> Any:
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str) and ref.startswith("#/$defs/"):
+                return walk(defs[ref.removeprefix("#/$defs/")])
+            return {k: walk(v) for k, v in node.items() if k != "$defs"}
+        if isinstance(node, list):
+            return [walk(v) for v in node]
+        return node
+
+    result: dict[str, Any] = walk(schema)
+    return result
+
+
 BOOKING_BODY: dict[str, Any] = {
     "requestBody": {
         "required": True,
-        "content": {"application/json": {"schema": BookingRequest.model_json_schema()}},
+        "content": {
+            "application/json": {"schema": _inline_defs(BookingRequest.model_json_schema())}
+        },
     }
 }
 BOOKING_RESPONSES: dict[int | str, dict[str, Any]] = {
